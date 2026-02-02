@@ -1396,6 +1396,14 @@
         <i class="fas fa-bell"></i>
     </button>
 
+
+
+    <!-- Após o botão de testar notificação -->
+<button id="testBackgroundNotification" class="test-notification-btn" 
+        style="bottom: 150px; background-color: #FF6600;" title="Testar Notificação em Background">
+    <i class="fas fa-cloud"></i>
+</button>
+
     <!-- Audio element for notification sound -->
     <audio id="notificationSound" preload="auto">
         <source src="https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3" type="audio/mpeg">
@@ -1919,99 +1927,167 @@ self.addEventListener('message', event => {
         }
 
         // Initialize Firebase Messaging
-// Função corrigida no index.html (dentro do script principal)
 async function initializeFirebaseMessaging() {
+    console.log('Inicializando Firebase Messaging...');
+    
     try {
-        // Verificar permissão
+        // 1. Verificar suporte do navegador
+        if (!('serviceWorker' in navigator)) {
+            console.error('Service Worker não suportado');
+            return false;
+        }
+        
+        if (!('PushManager' in window)) {
+            console.error('Push notifications não suportadas');
+            return false;
+        }
+        
+        // 2. Solicitar permissão se necessário
         if (Notification.permission === 'default') {
+            console.log('Solicitando permissão de notificação...');
             const permission = await Notification.requestPermission();
+            console.log('Permissão concedida:', permission);
+            
             if (permission !== 'granted') {
-                console.log('Permissão de notificação negada:', permission);
+                console.error('Permissão de notificação negada');
                 return false;
             }
         } else if (Notification.permission !== 'granted') {
-            console.log('Permissão de notificação não concedida:', Notification.permission);
+            console.error('Permissão de notificação não concedida:', Notification.permission);
             return false;
         }
         
-        console.log('Permissão de notificação concedida');
+        console.log('Permissão OK:', Notification.permission);
         
-        // IMPORTANTE: Registrar o service worker do Firebase
+        // 3. Registrar Service Worker do Firebase
+        console.log('Registrando Service Worker...');
+        let registration;
+        
         try {
-            // Registrar explicitamente o firebase-messaging-sw.js
-            serviceWorkerRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-                scope: '/'
-            });
-            console.log('Service Worker registrado:', serviceWorkerRegistration);
+            // TENTE PRIMEIRO: Usar o service worker existente
+            const existingRegistration = await navigator.serviceWorker.getRegistration();
             
-            // Aguardar o service worker estar ativo
-            await navigator.serviceWorker.ready;
-        } catch (swError) {
-            console.error('Erro ao registrar Service Worker:', swError);
-            // Tentar continuar mesmo sem registro explícito
-        }
-        
-        // Obter token FCM com a chave VAPID CORRETA
-        fcmToken = await messaging.getToken({
-            vapidKey: 'BHZkpGbYQLzHVVLde3xIC76ZQ72pxPdS3UOL7y8lobivhxbw6m6',
-            serviceWorkerRegistration: serviceWorkerRegistration
-        });
-        
-        if (fcmToken) {
-            console.log('Token FCM obtido com sucesso:', fcmToken);
-            
-            // Salvar token no banco de dados
-            if (currentUser) {
-                await saveFCMTokenToDatabase(fcmToken);
+            if (existingRegistration) {
+                console.log('Service Worker já registrado:', existingRegistration);
+                registration = existingRegistration;
+            } else {
+                // Registrar novo service worker
+                registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+                    scope: '/',
+                    updateViaCache: 'none'
+                });
+                
+                console.log('Novo Service Worker registrado:', registration);
+                
+                // Aguardar ativação
+                if (registration.installing) {
+                    await new Promise(resolve => {
+                        registration.installing.addEventListener('statechange', (e) => {
+                            if (e.target.state === 'activated') {
+                                resolve();
+                            }
+                        });
+                    });
+                }
             }
             
-            // Configurar handler para mensagens em primeiro plano
-            messaging.onMessage((payload) => {
-                console.log('Mensagem recebida em primeiro plano:', payload);
-                
-                // Mostrar notificação no app (frontend)
-                showMobileNotification({
-                    title: payload.notification?.title || payload.data?.title || 'MotoZap',
-                    message: payload.notification?.body || payload.data?.body || payload.data?.message || 'Nova notificação',
-                    type: payload.data?.type || 'info',
-                    data: payload.data
-                });
-            });
+            // Aguardar ready
+            await navigator.serviceWorker.ready;
+            console.log('Service Worker pronto');
             
-            return true;
-        } else {
-            console.log('Não foi possível obter token FCM');
+        } catch (swError) {
+            console.error('ERRO Service Worker:', swError);
             return false;
         }
-    } catch (error) {
-        console.error('Erro completo no Firebase Messaging:', error);
         
-        // Mostrar erro detalhado
+        // 4. Obter token FCM
+        console.log('Obtendo token FCM...');
+        let fcmToken;
+        
+        try {
+            // Obter token atual primeiro
+            fcmToken = await messaging.getToken({
+                vapidKey: 'BHZkpGbYQLzHVVLde3xIC76ZQ72pxPdS3UOL7y8lobivhxbw6m6',
+                serviceWorkerRegistration: registration
+            });
+            
+            console.log('Token FCM obtido:', fcmToken ? 'SIM' : 'NÃO');
+            
+            if (!fcmToken) {
+                // Tentar novamente sem serviceWorkerRegistration
+                fcmToken = await messaging.getToken({
+                    vapidKey: 'BHZkpGbYQLzHVVLde3xIC76ZQ72pxPdS3UOL7y8lobivhxbw6m6'
+                });
+                
+                console.log('Token FCM (2ª tentativa):', fcmToken ? 'SIM' : 'NÃO');
+            }
+            
+        } catch (tokenError) {
+            console.error('ERRO ao obter token FCM:', tokenError);
+            
+            // Tentativa alternativa
+            try {
+                fcmToken = await messaging.getToken();
+                console.log('Token FCM (alternativo):', fcmToken);
+            } catch (e) {
+                console.error('Falha total ao obter token:', e);
+                return false;
+            }
+        }
+        
+        if (!fcmToken) {
+            console.error('Não foi possível obter token FCM');
+            return false;
+        }
+        
+        console.log('Token FCM:', fcmToken);
+        
+        // 5. Salvar token no banco de dados
+        if (currentUser && fcmToken) {
+            console.log('Salvando token no banco de dados...');
+            await saveFCMTokenToDatabase(fcmToken);
+        }
+        
+        // 6. Configurar handler de mensagens em primeiro plano
+        messaging.onMessage((payload) => {
+            console.log('🎯 Mensagem em PRIMEIRO PLANO recebida:', payload);
+            
+            showMobileNotification({
+                title: payload.notification?.title || payload.data?.title || 'MotoZap',
+                message: payload.notification?.body || payload.data?.body || 'Nova mensagem',
+                type: payload.data?.type || 'info',
+                data: payload.data
+            });
+        });
+        
+        // 7. Monitorar atualizações do token
+        messaging.onTokenRefresh(async () => {
+            console.log('Token FCM atualizado');
+            const newToken = await messaging.getToken({
+                vapidKey: 'BHZkpGbYQLzHVVLde3xIC76ZQ72pxPdS3UOL7y8lobivhxbw6m6'
+            });
+            
+            if (newToken && currentUser) {
+                await saveFCMTokenToDatabase(newToken);
+            }
+        });
+        
+        console.log('✅ Firebase Messaging inicializado com sucesso!');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ ERRO FATAL no Firebase Messaging:', error);
+        
+        // Log detalhado do erro
         if (error.code) {
-            console.error('Código do erro:', error.code);
-            console.error('Mensagem do erro:', error.message);
+            console.error('Código:', error.code);
+            console.error('Mensagem:', error.message);
+            console.error('Stack:', error.stack);
         }
         
         return false;
     }
 }
-
-        // Save FCM token to database
-        async function saveFCMTokenToDatabase(token) {
-            try {
-                if (!currentUser || !token) return;
-                
-                const userRef = database.ref('users/' + currentUser.uid);
-                await userRef.update({
-                    fcmToken: token,
-                    fcmTokenUpdatedAt: new Date().toISOString()
-                });
-                
-                console.log('Token FCM salvo no banco de dados');
-            } catch (error) {
-                console.error('Erro ao salvar token FCM:', error);
-            }
-        }
 
         // Send push notification
         async function sendPushNotification(toUserId, notificationData) {
@@ -3864,6 +3940,50 @@ async function initializeFirebaseMessaging() {
                 }
             }
         });
+
+
+
+
+        // Testar notificação em background
+document.getElementById('testBackgroundNotification')?.addEventListener('click', async () => {
+    if (!currentUser || !currentUser.uid) {
+        alert('Faça login primeiro');
+        return;
+    }
+    
+    // Simular notificação push (em produção viria do Firebase)
+    const notificationData = {
+        notification: {
+            title: 'Teste Background',
+            body: 'Esta notificação deve aparecer mesmo com o app fechado!'
+        },
+        data: {
+            type: 'test',
+            message: 'Teste de notificação em background'
+        }
+    };
+    
+    // 1. Fechar o app
+    alert('Feche completamente o app (fechar aba ou minimizar) e aguarde 10 segundos. A notificação deve aparecer.');
+    
+    // 2. Enviar notificação após delay (simulação)
+    setTimeout(async () => {
+        // Em produção, você enviaria via backend
+        // Aqui vamos apenas mostrar uma notificação local
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+            const registration = await navigator.serviceWorker.ready;
+            
+            // Mostrar notificação usando Service Worker
+            registration.showNotification('Teste Background', {
+                body: 'Esta notificação veio do Service Worker!',
+                icon: 'https://cdn-icons-png.flaticon.com/512/2965/2965358.png',
+                badge: 'https://cdn-icons-png.flaticon.com/512/2965/2965358.png',
+                tag: 'test-background',
+                requireInteraction: true
+            });
+        }
+    }, 10000);
+});
     </script>
 </body>
 </html>
