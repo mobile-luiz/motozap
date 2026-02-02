@@ -1,127 +1,109 @@
-// No DOMContentLoaded, atualize para:
-document.addEventListener('DOMContentLoaded', async () => {
-    // Check if app is already installed
-    checkIfAppInstalled();
-    
-    // Listen for beforeinstallprompt event
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        showInstallPromotion();
-    });
-    
-    // Check if app is running in standalone mode
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-        isAppInstalled = true;
-        hideInstallPromotion();
-    }
-    
-    // Registrar Service Worker
-    await registerServiceWorker();
-    
-    // Inicializar Firebase Messaging
-    await initializeFirebaseMessaging();
-    
-    // Check if user is already logged in
-    auth.onAuthStateChanged((user) => {
-        if (user) {
-            currentUser = user;
-            loadUserData(user.uid);
-        } else {
-            showMainScreen();
-        }
-    });
-    
-    // Test if notification sound works
-    setTimeout(() => {
-        if (notificationAudio) {
-            notificationAudio.volume = 0.5;
-        }
-    }, 1000);
-    
-    // Phone formatting
-    profilePhone.addEventListener('input', formatPhoneInput);
-    document.getElementById('phone')?.addEventListener('input', formatPhoneInput);
-});
+// Importar scripts do Firebase
+importScripts('https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js');
+importScripts('https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js');
 
-// Nova função para registrar Service Worker
-async function registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
-        try {
-            // Primeiro, tentar registrar o service worker externo
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            console.log('Service Worker registrado com sucesso:', registration);
-            
-            // Aguardar o service worker estar ativo
-            if (registration.active) {
-                console.log('Service Worker ativo');
-            } else if (registration.installing) {
-                registration.installing.addEventListener('statechange', (e) => {
-                    if (e.target.state === 'activated') {
-                        console.log('Service Worker ativado');
-                    }
-                });
-            }
-            
-            // Escutar mensagens do Service Worker
-            navigator.serviceWorker.addEventListener('message', event => {
-                console.log('Mensagem do Service Worker:', event.data);
-                handleServiceWorkerMessage(event.data);
-            });
-            
-            return registration;
-            
-        } catch (error) {
-            console.error('Falha ao registrar Service Worker:', error);
-            
-            // Fallback: criar service worker inline
-            try {
-                const serviceWorkerContent = `
-self.addEventListener('install', event => {
-    console.log('Service Worker instalado');
-    self.skipWaiting();
-});
+// Configuração do Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyAQ5TIcslVidUaALCdoDb7G8j7rolAfT8w",
+    authDomain: "moto-c3a72.firebaseapp.com",
+    databaseURL: "https://moto-c3a72-default-rtdb.firebaseio.com",
+    projectId: "moto-c3a72",
+    storageBucket: "moto-c3a72.firebasestorage.app",
+    messagingSenderId: "721172312364",
+    appId: "1:721172312364:web:7c4078a036d47add743c89",
+    measurementId: "G-DSHQPKN8HK"
+};
 
-self.addEventListener('activate', event => {
-    console.log('Service Worker ativado');
-    event.waitUntil(clients.claim());
-});
+// Inicializar Firebase no Service Worker
+firebase.initializeApp(firebaseConfig);
 
-self.addEventListener('push', event => {
-    console.log('Push event received:', event);
+// Obter instância do Firebase Messaging
+const messaging = firebase.messaging();
+
+// Configurar o background handler
+messaging.setBackgroundMessageHandler(function(payload) {
+    console.log('[firebase-messaging-sw.js] Received background message:', payload);
     
-    let data = {};
-    if (event.data) {
-        data = event.data.json();
-    }
-    
-    const options = {
-        body: data.body || 'Nova notificação do MotoZap',
+    // Personalizar a notificação
+    const notificationTitle = payload.data?.title || payload.notification?.title || 'MotoZap';
+    const notificationOptions = {
+        body: payload.data?.body || payload.notification?.body || 'Nova notificação do MotoZap',
         icon: 'https://cdn-icons-png.flaticon.com/512/2965/2965358.png',
         badge: 'https://cdn-icons-png.flaticon.com/512/2965/2965358.png',
-        tag: 'motozap-push',
-        data: data.data || {},
-        requireInteraction: true
+        tag: 'motozap-notification',
+        data: payload.data || {},
+        requireInteraction: true,
+        actions: []
     };
     
-    event.waitUntil(
-        self.registration.showNotification(data.title || 'MotoZap', options)
-    );
+    // Adicionar ações baseadas no tipo de notificação
+    if (payload.data?.type === 'new-ride') {
+        notificationOptions.actions = [
+            {
+                action: 'accept',
+                title: '✅ Aceitar',
+                icon: 'https://cdn-icons-png.flaticon.com/512/190/190411.png'
+            },
+            {
+                action: 'decline',
+                title: '❌ Recusar',
+                icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828843.png'
+            }
+        ];
+    } else if (payload.data?.type === 'ride-accepted') {
+        notificationOptions.actions = [
+            {
+                action: 'whatsapp',
+                title: '💬 WhatsApp',
+                icon: 'https://cdn-icons-png.flaticon.com/512/220/220236.png'
+            }
+        ];
+    }
+    
+    return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-self.addEventListener('notificationclick', event => {
-    console.log('Notification click:', event);
+// Evento de clique na notificação
+self.addEventListener('notificationclick', function(event) {
+    console.log('[firebase-messaging-sw.js] Notification click:', event);
     
     event.notification.close();
     
     const notificationData = event.notification.data || {};
     
+    // Verificar qual ação foi clicada
+    if (event.action === 'accept') {
+        // Ação de aceitar corrida
+        console.log('Ação: accept', notificationData);
+    } else if (event.action === 'decline') {
+        // Ação de recusar corrida
+        console.log('Ação: decline', notificationData);
+    } else if (event.action === 'whatsapp') {
+        // Abrir WhatsApp
+        if (notificationData.phone) {
+            const phone = notificationData.phone.replace(/\D/g, '');
+            const formattedPhone = phone.startsWith('55') ? phone : '55' + phone;
+            const message = notificationData.message || 'Olá! Vi sua notificação do MotoZap.';
+            const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+            
+            event.waitUntil(
+                clients.openWindow(whatsappUrl)
+            );
+            return;
+        }
+    }
+    
+    // Abrir/focar a janela do app
     event.waitUntil(
-        clients.matchAll({type: 'window', includeUncontrolled: true})
-        .then(clientList => {
+        clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        }).then(function(clientList) {
+            // Verificar se já tem uma janela aberta
             for (const client of clientList) {
                 if (client.url.includes('/') && 'focus' in client) {
                     return client.focus().then(() => {
+                        // Enviar mensagem para a janela
                         if (client.postMessage) {
                             client.postMessage({
                                 type: 'NOTIFICATION_CLICK',
@@ -133,84 +115,32 @@ self.addEventListener('notificationclick', event => {
                 }
             }
             
+            // Se não houver janela aberta, abrir uma nova
             if (clients.openWindow) {
                 return clients.openWindow('/');
             }
         })
     );
 });
-                `;
-                
-                const blob = new Blob([serviceWorkerContent], {type: 'application/javascript'});
-                const url = URL.createObjectURL(blob);
-                const registration = await navigator.serviceWorker.register(url);
-                console.log('Service Worker inline registrado:', registration);
-                
-                return registration;
-                
-            } catch (fallbackError) {
-                console.error('Falha no fallback do Service Worker:', fallbackError);
-                return null;
-            }
-        }
-    } else {
-        console.log('Service Worker não suportado pelo navegador');
-        return null;
-    }
-}
 
-// Nova função para inicializar Firebase Messaging
-async function initializeFirebaseMessaging() {
-    try {
-        // Solicitar permissão
-        const permission = await Notification.requestPermission();
-        
-        if (permission === 'granted') {
-            console.log('Permissão de notificação concedida');
-            
-            // Obter token FCM
-            if ('serviceWorker' in navigator) {
-                const serviceWorkerRegistration = await navigator.serviceWorker.ready;
-                
-                // Usar VAPID key pública (você precisa gerar uma)
-                const vapidKey = 'BE6r0LR0z1pSzQRnNRV0TGbQ7QOY9epBAPJgLj0v2lS3JYVg3nSFhU1gyV_x3T1bZakO0pN_rB4Lw8YdWx1Sq_o';
-                
-                fcmToken = await messaging.getToken({
-                    serviceWorkerRegistration: serviceWorkerRegistration,
-                    vapidKey: vapidKey
-                });
-                
-                if (fcmToken) {
-                    console.log('Token FCM:', fcmToken);
-                    messagingInitialized = true;
-                    
-                    // Salvar token quando usuário fizer login
-                    if (currentUser) {
-                        await saveFCMTokenToDatabase(fcmToken);
-                    }
-                }
-            }
-            
-            // Configurar handler para mensagens em primeiro plano
-            messaging.onMessage((payload) => {
-                console.log('Mensagem recebida em primeiro plano:', payload);
-                
-                // Mostrar notificação no app
-                if (payload.notification) {
-                    showMobileNotification({
-                        title: payload.notification.title,
-                        message: payload.notification.body,
-                        type: payload.data?.type || 'info',
-                        data: payload.data
-                    });
-                }
-            });
-            
-        } else {
-            console.log('Permissão de notificação negada');
-        }
-        
-    } catch (error) {
-        console.error('Erro ao inicializar Firebase Messaging:', error);
+// Evento de instalação do Service Worker
+self.addEventListener('install', function(event) {
+    console.log('[firebase-messaging-sw.js] Service Worker instalado');
+    self.skipWaiting();
+});
+
+// Evento de ativação do Service Worker
+self.addEventListener('activate', function(event) {
+    console.log('[firebase-messaging-sw.js] Service Worker ativado');
+    event.waitUntil(clients.claim());
+});
+
+// Receber mensagens da janela principal
+self.addEventListener('message', function(event) {
+    console.log('[firebase-messaging-sw.js] Mensagem recebida:', event.data);
+    
+    if (event.data && event.data.type === 'FCM_TOKEN') {
+        // Armazenar token se necessário
+        console.log('Token FCM recebido no Service Worker:', event.data.token);
     }
-}
+});
