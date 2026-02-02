@@ -20,15 +20,21 @@ firebase.initializeApp(firebaseConfig);
 // Obter instância do Firebase Messaging
 const messaging = firebase.messaging();
 
-// Configurar o background handler (CORRIGIDO)
+// IMPORTANTE: Configurar o handler de mensagens em background
 messaging.setBackgroundMessageHandler(async (payload) => {
     console.log('[firebase-messaging-sw.js] Received background message:', payload);
     
     // Extrair dados da notificação
-    const notificationTitle = payload.data?.title || payload.notification?.title || 'MotoZap';
-    const notificationBody = payload.data?.body || payload.notification?.body || 'Nova notificação do MotoZap';
+    const notificationTitle = payload.data?.title || 
+                              payload.notification?.title || 
+                              'MotoZap';
     
-    // Personalizar a notificação
+    const notificationBody = payload.data?.body || 
+                             payload.notification?.body || 
+                             payload.data?.message ||
+                             'Nova notificação do MotoZap';
+    
+    // Opções da notificação
     const notificationOptions = {
         body: notificationBody,
         icon: 'https://cdn-icons-png.flaticon.com/512/2965/2965358.png',
@@ -36,11 +42,13 @@ messaging.setBackgroundMessageHandler(async (payload) => {
         tag: 'motozap-notification',
         data: payload.data || payload,
         requireInteraction: true,
-        actions: []
+        actions: [],
+        timestamp: Date.now(),
+        vibrate: [200, 100, 200]
     };
     
     // Adicionar ações baseadas no tipo de notificação
-    if (payload.data?.type === 'new-ride') {
+    if (payload.data?.type === 'new-ride' && payload.data?.rideId) {
         notificationOptions.actions = [
             {
                 action: 'accept',
@@ -63,7 +71,9 @@ messaging.setBackgroundMessageHandler(async (payload) => {
         ];
     }
     
-    // Mostrar a notificação
+    console.log('[firebase-messaging-sw.js] Showing notification:', notificationTitle, notificationOptions);
+    
+    // MOSTRAR A NOTIFICAÇÃO - ESSA É A LINHA CRÍTICA QUE FALTAVA
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
@@ -77,13 +87,18 @@ self.addEventListener('notificationclick', function(event) {
     
     // Verificar qual ação foi clicada
     if (event.action === 'accept') {
-        // Ação de aceitar corrida
         console.log('Ação: accept', notificationData);
+        // Focar/abrir o app
+        event.waitUntil(handleNotificationClick(notificationData, 'accept'));
+        
     } else if (event.action === 'decline') {
-        // Ação de recusar corrida
         console.log('Ação: decline', notificationData);
+        // Focar/abrir o app
+        event.waitUntil(handleNotificationClick(notificationData, 'decline'));
+        
     } else if (event.action === 'whatsapp') {
-        // Abrir WhatsApp
+        console.log('Ação: whatsapp', notificationData);
+        
         if (notificationData.phone) {
             const phone = notificationData.phone.replace(/\D/g, '');
             const formattedPhone = phone.startsWith('55') ? phone : '55' + phone;
@@ -95,37 +110,43 @@ self.addEventListener('notificationclick', function(event) {
             );
             return;
         }
+        
+        // Se não tiver telefone, focar o app
+        event.waitUntil(handleNotificationClick(notificationData, 'whatsapp'));
+    } else {
+        // Clique no corpo da notificação
+        console.log('Clique no corpo da notificação', notificationData);
+        event.waitUntil(handleNotificationClick(notificationData, ''));
     }
-    
-    // Abrir/focar a janela do app
-    event.waitUntil(
-        clients.matchAll({
-            type: 'window',
-            includeUncontrolled: true
-        }).then(function(clientList) {
-            // Verificar se já tem uma janela aberta
-            for (const client of clientList) {
-                if (client.url.includes('/') && 'focus' in client) {
-                    return client.focus().then(() => {
-                        // Enviar mensagem para a janela
-                        if (client.postMessage) {
-                            client.postMessage({
-                                type: 'NOTIFICATION_CLICK',
-                                data: notificationData,
-                                action: event.action
-                            });
-                        }
+});
+
+// Função auxiliar para lidar com clique na notificação
+function handleNotificationClick(notificationData, action) {
+    return clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
+    }).then(function(clientList) {
+        // Verificar se já tem uma janela aberta
+        for (const client of clientList) {
+            if (client.url.includes('/') && 'focus' in client) {
+                // Enviar mensagem para a janela
+                if (client.postMessage) {
+                    client.postMessage({
+                        type: 'NOTIFICATION_CLICK',
+                        data: notificationData,
+                        action: action
                     });
                 }
+                return client.focus();
             }
-            
-            // Se não houver janela aberta, abrir uma nova
-            if (clients.openWindow) {
-                return clients.openWindow('/');
-            }
-        })
-    );
-});
+        }
+        
+        // Se não houver janela aberta, abrir uma nova
+        if (clients.openWindow) {
+            return clients.openWindow('/');
+        }
+    });
+}
 
 // Evento de instalação do Service Worker
 self.addEventListener('install', function(event) {
@@ -144,7 +165,10 @@ self.addEventListener('message', function(event) {
     console.log('[firebase-messaging-sw.js] Mensagem recebida:', event.data);
     
     if (event.data && event.data.type === 'FCM_TOKEN') {
-        // Armazenar token se necessário
         console.log('Token FCM recebido no Service Worker:', event.data.token);
+    }
+    
+    if (event.data && event.data.type === 'NOTIFICATION_CLICK') {
+        console.log('Notificação clicada (via postMessage):', event.data);
     }
 });
