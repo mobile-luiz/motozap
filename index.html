@@ -9,6 +9,14 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js"></script>
+    
+    <!-- Manifest for PWA -->
+    <link rel="manifest" id="manifest">
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏍️</text></svg>">
+    
     <style>
         * {
             margin: 0;
@@ -64,6 +72,52 @@
             font-size: 1.2rem;
             opacity: 0.9;
             margin-bottom: 5px;
+        }
+
+        /* Install App Banner */
+        .install-banner {
+            background: linear-gradient(to right, #4CAF50, #2E7D32);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+            animation: slideDown 0.5s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .install-banner.hidden {
+            display: none;
+        }
+
+        .install-banner button {
+            background: white;
+            color: #2E7D32;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .install-banner button:hover {
+            background: #f0f0f0;
         }
 
         /* Main Content */
@@ -511,6 +565,30 @@
             }
         }
 
+        /* PWA Install Button */
+        .pwa-install-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #FF6600;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 102, 0, 0.3);
+            z-index: 999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pwa-install-btn:hover {
+            background: #FF3300;
+        }
+
         /* Responsive */
         @media (max-width: 600px) {
             .container {
@@ -533,10 +611,37 @@
                 width: 280px;
                 right: -10px;
             }
+            
+            .pwa-install-btn {
+                bottom: 70px;
+                right: 15px;
+            }
+        }
+
+        /* Fullscreen app mode */
+        @media all and (display-mode: standalone) {
+            .install-banner {
+                display: none !important;
+            }
+            
+            .pwa-install-btn {
+                display: none !important;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Install App Banner -->
+    <div id="installBanner" class="install-banner hidden">
+        <div>
+            <strong>📱 Instalar App MotoZap</strong>
+            <p style="margin-top: 5px; font-size: 0.9rem;">Tenha notificações push e acesso rápido!</p>
+        </div>
+        <button id="installBtn">
+            <i class="fas fa-download"></i> Instalar
+        </button>
+    </div>
+
     <!-- Main Screen -->
     <div id="mainScreen" class="container">
         <header>
@@ -786,6 +891,11 @@
     <!-- Notification Element -->
     <div id="notification" class="notification" style="display: none;"></div>
 
+    <!-- PWA Install Button -->
+    <button id="pwaInstallBtn" class="pwa-install-btn" title="Instalar App">
+        <i class="fas fa-plus"></i>
+    </button>
+
     <!-- Audio element for notification sound -->
     <audio id="notificationSound" preload="auto">
         <source src="https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3" type="audio/mpeg">
@@ -808,6 +918,7 @@
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const database = firebase.database();
+        let messaging = null;
 
         // Global Variables
         let isLoginMode = true;
@@ -821,6 +932,8 @@
         let notificationCount = 0;
         let notifications = [];
         let isNotificationPermissionGranted = false;
+        let deferredPrompt = null;
+        let isAppInstalled = false;
 
         // DOM Elements
         const mainScreen = document.getElementById('mainScreen');
@@ -854,6 +967,30 @@
         const newRideAlert = document.getElementById('newRideAlert');
         const viewNewRideBtn = document.getElementById('viewNewRideBtn');
         const alertMessage = document.getElementById('alertMessage');
+        const installBanner = document.getElementById('installBanner');
+        const installBtn = document.getElementById('installBtn');
+        const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+        
+        // Create Manifest dynamically
+        const manifest = {
+            "name": "MotoZap",
+            "short_name": "MotoZap",
+            "description": "Sua corrida rápida no interior",
+            "start_url": "/",
+            "display": "standalone",
+            "background_color": "#FF6600",
+            "theme_color": "#FF6600",
+            "icons": [
+                {
+                    "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏍️</text></svg>",
+                    "sizes": "72x72 96x96 128x128 144x144 152x152 192x192 384x384 512x512",
+                    "type": "image/svg+xml"
+                }
+            ]
+        };
+        
+        // Set manifest
+        document.getElementById('manifest').setAttribute('href', 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifest)));
         
         // Event Listeners
         passengerBtn.addEventListener('click', () => openAuthModal('passenger'));
@@ -862,6 +999,8 @@
         toggleAuthMode.addEventListener('click', toggleAuthFormMode);
         authForm.addEventListener('submit', handleAuthSubmit);
         logoutBtn.addEventListener('click', handleLogout);
+        installBtn.addEventListener('click', installPWA);
+        pwaInstallBtn.addEventListener('click', installPWA);
         
         // Notification bell click
         notificationBell.addEventListener('click', (e) => {
@@ -886,9 +1025,28 @@
         });
 
         // Initialize the app
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check if app is already installed
+            checkIfAppInstalled();
+            
+            // Listen for beforeinstallprompt event
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                showInstallPromotion();
+            });
+            
+            // Check if app is running in standalone mode
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                isAppInstalled = true;
+                hideInstallPromotion();
+            }
+            
+            // Initialize Firebase Cloud Messaging
+            await initializeFirebaseMessaging();
+            
             // Request notification permission
-            requestNotificationPermission();
+            await requestNotificationPermission();
             
             // Check if user is already logged in
             auth.onAuthStateChanged((user) => {
@@ -901,13 +1059,141 @@
             });
         });
 
+        // Check if app is installed
+        function checkIfAppInstalled() {
+            if (window.matchMedia('(display-mode: standalone)').matches ||
+                window.navigator.standalone ||
+                document.referrer.includes('android-app://')) {
+                isAppInstalled = true;
+                hideInstallPromotion();
+            }
+        }
+
+        // Show install promotion
+        function showInstallPromotion() {
+            if (!isAppInstalled && deferredPrompt) {
+                installBanner.classList.remove('hidden');
+                pwaInstallBtn.style.display = 'flex';
+            }
+        }
+
+        // Hide install promotion
+        function hideInstallPromotion() {
+            installBanner.classList.add('hidden');
+            pwaInstallBtn.style.display = 'none';
+        }
+
+        // Install PWA
+        async function installPWA() {
+            if (!deferredPrompt) return;
+            
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                console.log('App installed successfully');
+                isAppInstalled = true;
+                hideInstallPromotion();
+                showNotification('App instalado com sucesso!', 'success');
+            }
+            
+            deferredPrompt = null;
+        }
+
+        // Initialize Firebase Cloud Messaging
+        async function initializeFirebaseMessaging() {
+            try {
+                if (!firebase.messaging.isSupported()) {
+                    console.log('Firebase Cloud Messaging não é suportado neste navegador');
+                    return;
+                }
+                
+                messaging = firebase.messaging();
+                
+                // Request permission for notifications
+                const permission = await Notification.requestPermission();
+                isNotificationPermissionGranted = permission === 'granted';
+                
+                if (isNotificationPermissionGranted) {
+                    // Get FCM token
+                    const token = await messaging.getToken();
+                    console.log('FCM Token:', token);
+                    
+                    // Save token to database when user logs in
+                    auth.onAuthStateChanged(async (user) => {
+                        if (user && token) {
+                            await database.ref(`users/${user.uid}/fcmToken`).set(token);
+                        }
+                    });
+                    
+                    // Handle incoming messages when app is in foreground
+                    messaging.onMessage((payload) => {
+                        console.log('Message received in foreground:', payload);
+                        handlePushNotification(payload);
+                    });
+                    
+                    // Handle background messages
+                    navigator.serviceWorker.addEventListener('message', (event) => {
+                        if (event.data && event.data.type === 'FCM_MESSAGE') {
+                            handlePushNotification(event.data.payload);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error initializing Firebase Messaging:', error);
+            }
+        }
+
+        // Handle push notifications
+        function handlePushNotification(payload) {
+            const notification = payload.notification || payload.data;
+            
+            if (notification) {
+                // Show notification
+                showNotification(notification.title || 'MotoZap', 'info');
+                
+                // Play sound
+                try {
+                    notificationSound.currentTime = 0;
+                    notificationSound.play();
+                } catch (e) {
+                    console.log("Erro ao tocar som:", e);
+                }
+                
+                // Update notification count
+                notificationCount++;
+                updateNotificationBadge();
+                
+                // If user is driver and it's a new ride, show alert
+                if (currentUser && currentUser.role === 'driver' && 
+                    notification.title && notification.title.includes('Nova Corrida')) {
+                    showNewRideAlertMessage(notification.body || 'Uma nova corrida está disponível');
+                }
+            }
+        }
+
         // Request notification permission
-        function requestNotificationPermission() {
+        async function requestNotificationPermission() {
             if ("Notification" in window && Notification.permission === "default") {
-                Notification.requestPermission().then(permission => {
+                try {
+                    const permission = await Notification.requestPermission();
                     isNotificationPermissionGranted = permission === "granted";
                     console.log("Permissão de notificação:", permission);
-                });
+                    
+                    if (isNotificationPermissionGranted && messaging) {
+                        // Register Service Worker for background notifications
+                        if ('serviceWorker' in navigator) {
+                            try {
+                                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                                console.log('Service Worker registrado com sucesso:', registration);
+                            } catch (error) {
+                                console.error('Erro ao registrar Service Worker:', error);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error("Erro ao solicitar permissão:", error);
+                }
             } else if (Notification.permission === "granted") {
                 isNotificationPermissionGranted = true;
             }
@@ -993,7 +1279,8 @@
             if (isNotificationPermissionGranted && type !== 'info') {
                 const notification = new Notification("MotoZap", {
                     body: message,
-                    icon: "https://cdn-icons-png.flaticon.com/512/2965/2965306.png"
+                    icon: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏍️</text></svg>",
+                    badge: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏍️</text></svg>"
                 });
                 
                 notification.onclick = () => {
@@ -1005,6 +1292,25 @@
             setTimeout(() => {
                 notificationElement.style.display = 'none';
             }, 3000);
+        }
+
+        function showNewRideAlertMessage(message) {
+            newRideAlert.style.display = 'block';
+            alertMessage.textContent = message;
+            
+            // Auto-hide after 30 seconds
+            setTimeout(() => {
+                newRideAlert.style.display = 'none';
+            }, 30000);
+        }
+
+        function updateNotificationBadge() {
+            if (notificationCount > 0) {
+                notificationBadge.textContent = notificationCount > 9 ? '9+' : notificationCount;
+                notificationBadge.style.display = 'flex';
+            } else {
+                notificationBadge.style.display = 'none';
+            }
         }
 
         async function handleAuthSubmit(e) {
@@ -1155,6 +1461,13 @@
                         listenToDriverActiveRide(userId);
                         loadNotifications(userId);
                         listenForNewRides();
+                        
+                        // Send test notification to driver (for demonstration)
+                        setTimeout(() => {
+                            if (isNotificationPermissionGranted) {
+                                showNotification('Você agora está online e receberá notificações de novas corridas!', 'success');
+                            }
+                        }, 1000);
                     }
                     
                     showDashboard();
@@ -1328,12 +1641,15 @@
                                 const isAvailable = driverSnapshot.val();
                                 
                                 if (isAvailable && currentUser.uid !== ride.passengerId) {
-                                    // Create notification for new ride
+                                    // Send push notification to all available drivers
+                                    sendPushNotificationToDrivers(ride);
+                                    
+                                    // Create notification for current driver
                                     const notification = {
                                         id: rideId,
                                         type: 'new_ride',
                                         title: 'Nova Corrida Disponível!',
-                                        message: `${ride.passengerName} solicitou uma corrida de ${ride.pickup} para ${ride.destination}`,
+                                        message: `${ride.passengerName} solicitou uma corrida de ${ride.pickup} para ${ride.destination} por R$ ${ride.price}`,
                                         rideId: rideId,
                                         timestamp: new Date().getTime(),
                                         read: false
@@ -1343,7 +1659,7 @@
                                     database.ref(`notifications/${currentUser.uid}/${rideId}`).set(notification);
                                     
                                     // Show alert banner
-                                    showNewRideAlert(ride);
+                                    showNewRideAlertMessage(notification.message);
                                     
                                     // Show notification
                                     showNotification(`Nova corrida de ${ride.passengerName}!`, 'warning');
@@ -1353,14 +1669,47 @@
                 });
         }
 
-        function showNewRideAlert(ride) {
-            newRideAlert.style.display = 'block';
-            alertMessage.textContent = `${ride.passengerName} solicitou uma corrida de ${ride.pickup} para ${ride.destination} por R$ ${ride.price}`;
-            
-            // Auto-hide after 30 seconds
-            setTimeout(() => {
-                newRideAlert.style.display = 'none';
-            }, 30000);
+        // Send push notification to all available drivers
+        async function sendPushNotificationToDrivers(ride) {
+            try {
+                // Get all available drivers
+                const driversSnapshot = await database.ref('drivers').orderByChild('available').equalTo(true).once('value');
+                const drivers = driversSnapshot.val();
+                
+                if (!drivers) return;
+                
+                // Get FCM tokens of all available drivers
+                const driverIds = Object.keys(drivers);
+                const tokens = [];
+                
+                for (const driverId of driverIds) {
+                    if (driverId !== currentUser.uid) { // Don't notify the passenger
+                        const driverSnapshot = await database.ref(`users/${driverId}/fcmToken`).once('value');
+                        const token = driverSnapshot.val();
+                        if (token) {
+                            tokens.push(token);
+                        }
+                    }
+                }
+                
+                if (tokens.length === 0) return;
+                
+                // In a real app, you would send this to your backend which would use Firebase Admin SDK
+                // For now, we'll just log it
+                console.log('Would send push notification to drivers with tokens:', tokens);
+                console.log('Notification data:', {
+                    title: 'Nova Corrida Disponível!',
+                    body: `${ride.passengerName} solicitou uma corrida de ${ride.pickup} para ${ride.destination}`,
+                    data: {
+                        rideId: ride.id,
+                        type: 'new_ride',
+                        click_action: 'FLUTTER_NOTIFICATION_CLICK'
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Error sending push notifications:', error);
+            }
         }
 
         function createRideRequestElement(rideId, ride) {
@@ -1414,7 +1763,7 @@
                 database.ref(`notifications/${userId}`).on('child_added', (snapshot) => {
                     const notification = snapshot.val();
                     addNotificationToList(notification, snapshot.key);
-                    updateNotificationCount();
+                    updateNotificationBadge();
                 });
                 
             } catch (error) {
@@ -1424,12 +1773,7 @@
 
         function updateNotificationUI() {
             // Update badge count
-            if (notificationCount > 0) {
-                notificationBadge.textContent = notificationCount;
-                notificationBadge.style.display = 'flex';
-            } else {
-                notificationBadge.style.display = 'none';
-            }
+            updateNotificationBadge();
             
             // Update notification list
             notificationList.innerHTML = '';
@@ -1788,16 +2132,6 @@
             }
         }
 
-        function updateNotificationCount() {
-            notificationCount = notifications.filter(n => !n.read).length;
-            if (notificationCount > 0) {
-                notificationBadge.textContent = notificationCount > 9 ? '9+' : notificationCount;
-                notificationBadge.style.display = 'flex';
-            } else {
-                notificationBadge.style.display = 'none';
-            }
-        }
-
         // Ride request functionality
         document.getElementById('requestRideBtn')?.addEventListener('click', async () => {
             const pickup = document.getElementById('pickupLocation').value;
@@ -2064,6 +2398,82 @@
                 }
             }
         });
+    </script>
+    
+    <!-- Inline Service Worker for Firebase Messaging -->
+    <script>
+        // Register Service Worker inline
+        if ('serviceWorker' in navigator) {
+            // Create a blob with the service worker code
+            const swCode = `
+                importScripts('https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js');
+                importScripts('https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js');
+                
+                // Initialize Firebase
+                firebase.initializeApp({
+                    apiKey: "AIzaSyAQ5TIcslVidUaALCdoDb7G8j7rolAfT8w",
+                    authDomain: "moto-c3a72.firebaseapp.com",
+                    databaseURL: "https://moto-c3a72-default-rtdb.firebaseio.com",
+                    projectId: "moto-c3a72",
+                    storageBucket: "moto-c3a72.firebasestorage.app",
+                    messagingSenderId: "721172312364",
+                    appId: "1:721172312364:web:7c4078a036d47add743c89",
+                    measurementId: "G-DSHQPKN8HK"
+                });
+                
+                const messaging = firebase.messaging();
+                
+                // Handle background messages
+                messaging.setBackgroundMessageHandler(function(payload) {
+                    console.log('[firebase-messaging-sw.js] Received background message:', payload);
+                    
+                    // Customize notification here
+                    const notificationTitle = payload.notification?.title || 'MotoZap';
+                    const notificationOptions = {
+                        body: payload.notification?.body || 'Nova notificação',
+                        icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏍️</text></svg>',
+                        badge: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏍️</text></svg>',
+                        data: payload.data || {}
+                    };
+                    
+                    return self.registration.showNotification(notificationTitle, notificationOptions);
+                });
+                
+                // Handle notification click
+                self.addEventListener('notificationclick', function(event) {
+                    console.log('[firebase-messaging-sw.js] Notification click received.');
+                    
+                    event.notification.close();
+                    
+                    // Focus or open the app
+                    event.waitUntil(
+                        clients.matchAll({type: 'window', includeUncontrolled: true})
+                        .then(function(clientList) {
+                            for (let i = 0; i < clientList.length; i++) {
+                                const client = clientList[i];
+                                if (client.url === '/' && 'focus' in client) {
+                                    return client.focus();
+                                }
+                            }
+                            if (clients.openWindow) {
+                                return clients.openWindow('/');
+                            }
+                        })
+                    );
+                });
+            `;
+            
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swURL = URL.createObjectURL(blob);
+            
+            navigator.serviceWorker.register(swURL)
+                .then(registration => {
+                    console.log('Service Worker registrado com sucesso:', registration);
+                })
+                .catch(error => {
+                    console.error('Erro ao registrar Service Worker:', error);
+                });
+        }
     </script>
 </body>
 </html>
