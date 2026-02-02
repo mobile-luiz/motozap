@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MotoZap - Sua corrida rápida no interior</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            width: 100%;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(to right, #FF6600, #FF3300);
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+            box-shadow: 0 4px 12px rgba(255, 102, 0, 0.3);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .logo i {
+            font-size: 2.5rem;
+            margin-right: 15px;
+        }
+
+        .logo h1 {
+            font-size: 2.2rem;
+            letter-spacing: 1px;
+        }
+
+        .tagline {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        /* Main Content */
+        .user-options {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            margin: 40px 0;
+        }
+
+        .option-card {
+            background-color: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            border-left: 6px solid #FF6600;
+        }
+
+        .option-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .option-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .option-header i {
+            font-size: 2rem;
+            color: #FF6600;
+            margin-right: 15px;
+        }
+
+        .option-header h2 {
+            font-size: 1.8rem;
+            color: #333;
+        }
+
+        .option-description {
+            color: #666;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        .btn-action {
+            background-color: #FF6600;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s;
+            width: 100%;
+        }
+
+        .btn-action i {
+            margin-right: 10px;
+        }
+
+        .btn-action:hover {
+            background-color: #FF3300;
+        }
+
+        /* Info Section */
+        .info-box {
+            background-color: #FFF8F0;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+            border: 1px dashed #FF9900;
+        }
+
+        .info-box h3 {
+            color: #FF6600;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .info-box h3 i {
+            margin-right: 10px;
+        }
+
+        .info-box p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 1.05rem;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 25px 0;
+            color: #666;
+            margin-top: auto;
+            border-top: 1px solid #eee;
+        }
+
+        .footer-logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #FF6600;
+            margin-bottom: 10px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 1.8rem;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .close-modal:hover {
+            color: #FF3300;
+        }
+
+        .modal h2 {
+            color: #FF6600;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .form-control:focus {
+            border-color: #FF6600;
+            outline: none;
+        }
+
+        /* Status Messages */
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status-success {
+            background-color: #e7f7ef;
+            color: #0a5c36;
+            border-left: 4px solid #0a5c36;
+        }
+
+        .status-error {
+            background-color: #fde8e8;
+            color: #c53030;
+            border-left: 4px solid #c53030;
+        }
+
+        .status-info {
+            background-color: #e8f4fd;
+            color: #2c5282;
+            border-left: 4px solid #2c5282;
+        }
+
+        /* Dashboard */
+        .dashboard {
+            display: none;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #FF6600;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-right: 15px;
+        }
+
+        .logout-btn {
+            background-color: #f5f5f5;
+            color: #666;
+            border: 1px solid #ddd;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .logout-btn:hover {
+            background-color: #eee;
+        }
+
+        /* Ride Status */
+        .ride-status-box {
+            background-color: #FFF8F0;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+            border: 1px solid #FF9900;
+        }
+
+        .ride-details {
+            margin: 15px 0;
+        }
+
+        .ride-detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #ddd;
+        }
+
+        .driver-card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #FF6600;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 300px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification-success {
+            border-left: 4px solid #0a5c36;
+        }
+
+        .notification-error {
+            border-left: 4px solid #c53030;
+        }
+
+        .notification-info {
+            border-left: 4px solid #2c5282;
+        }
+
+        .notification-warning {
+            border-left: 4px solid #FF9900;
+        }
+
+        /* Badge for new ride notifications */
+        .badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background-color: #FF3300;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        /* Notification Bell */
+        .notification-bell {
+            position: relative;
+            margin-right: 20px;
+            cursor: pointer;
+        }
+
+        .notification-bell i {
+            font-size: 1.5rem;
+            color: #FF6600;
+        }
+
+        .notification-bell:hover i {
+            color: #FF3300;
+        }
+
+        /* Notification Dropdown */
+        .notification-dropdown {
+            position: absolute;
+            top: 40px;
+            right: 0;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1001;
+        }
+
+        .notification-dropdown.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .notification-header {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .notification-header h4 {
+            margin: 0;
+            color: #FF6600;
+        }
+
+        .notification-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .notification-item:hover {
+            background-color: #f9f9f9;
+        }
+
+        .notification-item.unread {
+            background-color: #FFF8F0;
+        }
+
+        .notification-time {
+            font-size: 0.8rem;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        /* Alert for new ride */
+        .new-ride-alert {
+            background-color: #FFF8F0;
+            border: 2px solid #FF6600;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 102, 0, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(255, 102, 0, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 102, 0, 0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .logo h1 {
+                font-size: 1.8rem;
+            }
+            
+            .option-card {
+                padding: 20px;
+            }
+            
+            .option-header h2 {
+                font-size: 1.5rem;
+            }
+            
+            .notification-dropdown {
+                width: 280px;
+                right: -10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Screen -->
+    <div id="mainScreen" class="container">
+        <header>
+            <div class="logo">
+                <i class="fas fa-motorcycle"></i>
+                <h1>MOTOZAP</h1>
+            </div>
+            <p class="tagline">Sua corrida rápida no interior</p>
+        </header>
+
+        <main>
+            <div class="user-options">
+                <!-- Passenger Option -->
+                <div class="option-card" id="passengerOption">
+                    <div class="option-header">
+                        <i class="fas fa-user"></i>
+                        <h2>Sou Passageiro</h2>
+                    </div>
+                    <p class="option-description">
+                        Quero pedir uma moto agora para me levar ao meu destino com rapidez e segurança.
+                    </p>
+                    <button class="btn-action" id="passengerBtn">
+                        <i class="fas fa-motorcycle"></i> Pedir uma Moto
+                    </button>
+                </div>
+
+                <!-- Driver Option -->
+                <div class="option-card" id="driverOption">
+                    <div class="option-header">
+                        <i class="fas fa-helmet-safety"></i>
+                        <h2>Sou Piloto</h2>
+                    </div>
+                    <p class="option-description">
+                        Quero realizar corridas e aumentar minha renda transportando passageiros pela cidade.
+                    </p>
+                    <button class="btn-action" id="driverBtn">
+                        <i class="fas fa-road"></i> Realizar Corridas
+                    </button>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3><i class="fas fa-info-circle"></i> Importante</h3>
+                <p>O valor da corrida é combinado <strong>diretamente com o piloto</strong>, garantindo flexibilidade e negociação justa para ambos.</p>
+                <p style="margin-top: 10px;"><strong>MotoZap</strong> - O mototáxi do interior</p>
+            </div>
+        </main>
+
+        <footer>
+            <div class="footer-logo">MotoZap</div>
+            <p>Conectando passageiros e pilotos no interior</p>
+            <p style="margin-top: 10px; font-size: 0.9rem;">© 2023 MotoZap - Todos os direitos reservados</p>
+        </footer>
+    </div>
+
+    <!-- Login/Register Modal -->
+    <div id="authModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="closeModal">&times;</span>
+            <h2 id="modalTitle">Entrar no MotoZap</h2>
+            
+            <div id="statusMessage" class="status-message"></div>
+            
+            <form id="authForm">
+                <div class="form-group">
+                    <label for="email">E-mail</label>
+                    <input type="email" id="email" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" class="form-control" required minlength="6">
+                </div>
+                
+                <div class="form-group" id="nameField" style="display: none;">
+                    <label for="name">Nome Completo</label>
+                    <input type="text" id="name" class="form-control" required>
+                </div>
+                
+                <div class="form-group" id="phoneField" style="display: none;">
+                    <label for="phone">Telefone</label>
+                    <input type="tel" id="phone" class="form-control" placeholder="(11) 99999-9999" required>
+                </div>
+                
+                <div class="form-group" id="vehicleField" style="display: none;">
+                    <label for="vehicle">Placa da Moto</label>
+                    <input type="text" id="vehicle" class="form-control" placeholder="ABC-1234">
+                </div>
+                
+                <button type="submit" class="btn-action" id="authSubmit">
+                    <i class="fas fa-sign-in-alt"></i> Entrar
+                </button>
+            </form>
+            
+            <p style="margin-top: 20px; text-align: center;">
+                <a href="#" id="toggleAuthMode">Não tem uma conta? Cadastre-se</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Dashboard (for logged in users) -->
+    <div id="dashboardScreen" class="container dashboard">
+        <div class="dashboard-header">
+            <div class="user-info">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <div>
+                    <h3 id="userName">Usuário</h3>
+                    <p id="userRole">Papel</p>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center;">
+                <!-- Notification Bell (only for drivers) -->
+                <div id="notificationBell" class="notification-bell" style="display: none;">
+                    <i class="fas fa-bell"></i>
+                    <span id="notificationBadge" class="badge" style="display: none;">0</span>
+                    <div id="notificationDropdown" class="notification-dropdown">
+                        <div class="notification-header">
+                            <h4>Notificações</h4>
+                            <button id="clearNotifications" style="background: none; border: none; color: #999; cursor: pointer;">
+                                Limpar todas
+                            </button>
+                        </div>
+                        <div id="notificationList">
+                            <!-- Notifications will be added here -->
+                        </div>
+                        <div id="noNotifications" style="padding: 20px; text-align: center; color: #999;">
+                            Nenhuma notificação
+                        </div>
+                    </div>
+                </div>
+                <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Sair</button>
+            </div>
+        </div>
+        
+        <div id="passengerDashboard" style="display: none;">
+            <h2 style="color: #FF6600; margin-bottom: 20px;">Buscar Corrida</h2>
+            <div class="option-card">
+                <div class="option-header">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <h2>Solicitar Corrida</h2>
+                </div>
+                <p class="option-description">
+                    Informe seu destino e encontraremos um piloto disponível para te atender.
+                </p>
+                <div class="form-group">
+                    <label for="pickupLocation">Local de Partida</label>
+                    <input type="text" id="pickupLocation" class="form-control" placeholder="Ex: Av. Paulista, 1000" value="Centro da Cidade">
+                </div>
+                <div class="form-group">
+                    <label for="destination">Destino</label>
+                    <input type="text" id="destination" class="form-control" placeholder="Ex: Jardim Botânico" value="Bairro Residencial">
+                </div>
+                <div class="form-group">
+                    <label for="ridePrice">Valor Sugerido (R$)</label>
+                    <input type="number" id="ridePrice" class="form-control" placeholder="20.00" value="15" min="5" step="0.01">
+                </div>
+                <button class="btn-action" id="requestRideBtn">
+                    <i class="fas fa-search"></i> Buscar Piloto
+                </button>
+            </div>
+            
+            <div id="rideStatus" class="ride-status-box" style="display: none;">
+                <h3><i class="fas fa-spinner fa-spin" id="rideStatusIcon"></i> <span id="rideStatusTitle">Status da Corrida</span></h3>
+                <div id="rideDetails">
+                    <!-- Ride details will be inserted here -->
+                </div>
+                <div id="rideActions" style="margin-top: 20px;">
+                    <button class="btn-action" id="cancelRideBtn" style="background-color: #dc3545;">
+                        <i class="fas fa-times"></i> Cancelar Corrida
+                    </button>
+                </div>
+            </div>
+            
+            <div id="passengerHistory" class="info-box" style="margin-top: 20px;">
+                <h3><i class="fas fa-history"></i> Histórico de Corridas</h3>
+                <p id="noHistoryMessage">Você ainda não realizou nenhuma corrida.</p>
+                <div id="historyList" style="display: none;"></div>
+            </div>
+        </div>
+        
+        <div id="driverDashboard" style="display: none;">
+            <h2 style="color: #FF6600; margin-bottom: 20px;">Painel do Piloto</h2>
+            
+            <!-- New Ride Alert -->
+            <div id="newRideAlert" class="new-ride-alert" style="display: none;">
+                <h4 style="color: #FF6600; margin-bottom: 10px;">
+                    <i class="fas fa-bell"></i> NOVA CORRIDA DISPONÍVEL!
+                </h4>
+                <p id="alertMessage">Uma nova corrida está disponível. Verifique abaixo!</p>
+                <button class="btn-action" id="viewNewRideBtn" style="margin-top: 10px; background-color: #FF6600;">
+                    <i class="fas fa-eye"></i> Ver Corrida
+                </button>
+            </div>
+            
+            <div class="option-card">
+                <div class="option-header">
+                    <i class="fas fa-road"></i>
+                    <h2>Disponibilidade</h2>
+                </div>
+                <p class="option-description">
+                    Alterne sua disponibilidade para receber solicitações de corrida.
+                </p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <button class="btn-action" id="toggleAvailabilityBtn" style="width: auto; padding: 15px 30px;">
+                        <i class="fas fa-power-off"></i> <span id="availabilityText">Estou Disponível</span>
+                    </button>
+                </div>
+                <p id="availabilityStatus" style="text-align: center; font-weight: bold; color: #dc3545;">
+                    Status: Indisponível
+                </p>
+            </div>
+            
+            <div id="activeRideRequests" class="info-box" style="margin-top: 20px;">
+                <h3><i class="fas fa-bell"></i> Solicitações de Corrida</h3>
+                <div id="rideRequestsList">
+                    <!-- Ride requests will be inserted here -->
+                </div>
+                <p id="noRequestsMessage">Nenhuma solicitação de corrida no momento. Fique disponível para receber pedidos.</p>
+            </div>
+            
+            <div id="activeRide" class="ride-status-box" style="display: none;">
+                <h3><i class="fas fa-motorcycle"></i> Corrida Ativa</h3>
+                <div id="activeRideDetails">
+                    <!-- Active ride details will be inserted here -->
+                </div>
+                <div style="margin-top: 20px;">
+                    <button class="btn-action" id="startRideBtn" style="background-color: #0a5c36;">
+                        <i class="fas fa-play"></i> Iniciar Corrida
+                    </button>
+                    <button class="btn-action" id="completeRideBtn" style="background-color: #0a5c36; display: none;">
+                        <i class="fas fa-flag-checkered"></i> Finalizar Corrida
+                    </button>
+                    <button class="btn-action" id="cancelActiveRideBtn" style="background-color: #dc3545; margin-top: 10px;">
+                        <i class="fas fa-times"></i> Cancelar Corrida
+                    </button>
+                </div>
+            </div>
+            
+            <div id="driverHistory" class="info-box" style="margin-top: 20px;">
+                <h3><i class="fas fa-history"></i> Histórico de Corridas</h3>
+                <p id="driverNoHistoryMessage">Você ainda não realizou nenhuma corrida.</p>
+                <div id="driverHistoryList" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Element -->
+    <div id="notification" class="notification" style="display: none;"></div>
+
+    <!-- Audio element for notification sound -->
+    <audio id="notificationSound" preload="auto">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAQ5TIcslVidUaALCdoDb7G8j7rolAfT8w",
+            authDomain: "moto-c3a72.firebaseapp.com",
+            databaseURL: "https://moto-c3a72-default-rtdb.firebaseio.com",
+            projectId: "moto-c3a72",
+            storageBucket: "moto-c3a72.firebasestorage.app",
+            messagingSenderId: "721172312364",
+            appId: "1:721172312364:web:7c4078a036d47add743c89",
+            measurementId: "G-DSHQPKN8HK"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
+
+        // Global Variables
+        let isLoginMode = true;
+        let userRole = '';
+        let currentUser = null;
+        let currentRideId = null;
+        let rideRequestsListener = null;
+        let passengerRideListener = null;
+        let driverActiveRideListener = null;
+        let notificationsListener = null;
+        let notificationCount = 0;
+        let notifications = [];
+        let isNotificationPermissionGranted = false;
+
+        // DOM Elements
+        const mainScreen = document.getElementById('mainScreen');
+        const dashboardScreen = document.getElementById('dashboardScreen');
+        const authModal = document.getElementById('authModal');
+        const passengerBtn = document.getElementById('passengerBtn');
+        const driverBtn = document.getElementById('driverBtn');
+        const closeModal = document.getElementById('closeModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const authForm = document.getElementById('authForm');
+        const authSubmit = document.getElementById('authSubmit');
+        const toggleAuthMode = document.getElementById('toggleAuthMode');
+        const nameField = document.getElementById('nameField');
+        const phoneField = document.getElementById('phoneField');
+        const vehicleField = document.getElementById('vehicleField');
+        const statusMessage = document.getElementById('statusMessage');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const userName = document.getElementById('userName');
+        const userAvatar = document.getElementById('userAvatar');
+        const userRoleElement = document.getElementById('userRole');
+        const passengerDashboard = document.getElementById('passengerDashboard');
+        const driverDashboard = document.getElementById('driverDashboard');
+        const notificationElement = document.getElementById('notification');
+        const notificationSound = document.getElementById('notificationSound');
+        const notificationBell = document.getElementById('notificationBell');
+        const notificationBadge = document.getElementById('notificationBadge');
+        const notificationDropdown = document.getElementById('notificationDropdown');
+        const notificationList = document.getElementById('notificationList');
+        const noNotifications = document.getElementById('noNotifications');
+        const clearNotificationsBtn = document.getElementById('clearNotifications');
+        const newRideAlert = document.getElementById('newRideAlert');
+        const viewNewRideBtn = document.getElementById('viewNewRideBtn');
+        const alertMessage = document.getElementById('alertMessage');
+        
+        // Event Listeners
+        passengerBtn.addEventListener('click', () => openAuthModal('passenger'));
+        driverBtn.addEventListener('click', () => openAuthModal('driver'));
+        closeModal.addEventListener('click', closeAuthModal);
+        toggleAuthMode.addEventListener('click', toggleAuthFormMode);
+        authForm.addEventListener('submit', handleAuthSubmit);
+        logoutBtn.addEventListener('click', handleLogout);
+        
+        // Notification bell click
+        notificationBell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notificationDropdown.classList.toggle('show');
+        });
+        
+        // Clear notifications
+        clearNotificationsBtn.addEventListener('click', clearAllNotifications);
+        
+        // View new ride button
+        viewNewRideBtn.addEventListener('click', () => {
+            newRideAlert.style.display = 'none';
+            document.getElementById('activeRideRequests').scrollIntoView({ behavior: 'smooth' });
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!notificationBell.contains(e.target) && !notificationDropdown.contains(e.target)) {
+                notificationDropdown.classList.remove('show');
+            }
+        });
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            // Request notification permission
+            requestNotificationPermission();
+            
+            // Check if user is already logged in
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    currentUser = user;
+                    loadUserData(user.uid);
+                } else {
+                    showMainScreen();
+                }
+            });
+        });
+
+        // Request notification permission
+        function requestNotificationPermission() {
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission().then(permission => {
+                    isNotificationPermissionGranted = permission === "granted";
+                    console.log("Permissão de notificação:", permission);
+                });
+            } else if (Notification.permission === "granted") {
+                isNotificationPermissionGranted = true;
+            }
+        }
+
+        // Functions
+        function openAuthModal(role) {
+            userRole = role;
+            isLoginMode = true;
+            updateAuthForm();
+            authModal.style.display = 'flex';
+        }
+
+        function closeAuthModal() {
+            authModal.style.display = 'none';
+            resetAuthForm();
+        }
+
+        function toggleAuthFormMode(e) {
+            e.preventDefault();
+            isLoginMode = !isLoginMode;
+            updateAuthForm();
+        }
+
+        function updateAuthForm() {
+            if (isLoginMode) {
+                modalTitle.textContent = `Entrar como ${userRole === 'passenger' ? 'Passageiro' : 'Piloto'}`;
+                authSubmit.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';
+                toggleAuthMode.textContent = 'Não tem uma conta? Cadastre-se';
+                
+                nameField.style.display = 'none';
+                phoneField.style.display = 'none';
+                vehicleField.style.display = 'none';
+            } else {
+                modalTitle.textContent = `Cadastrar como ${userRole === 'passenger' ? 'Passageiro' : 'Piloto'}`;
+                authSubmit.innerHTML = '<i class="fas fa-user-plus"></i> Cadastrar';
+                toggleAuthMode.textContent = 'Já tem uma conta? Faça login';
+                
+                nameField.style.display = 'block';
+                phoneField.style.display = 'block';
+                vehicleField.style.display = userRole === 'driver' ? 'block' : 'none';
+                
+                if (userRole === 'driver') {
+                    document.getElementById('vehicle').required = true;
+                } else {
+                    document.getElementById('vehicle').required = false;
+                }
+            }
+            
+            hideStatusMessage();
+        }
+
+        function resetAuthForm() {
+            authForm.reset();
+            hideStatusMessage();
+        }
+
+        function showStatusMessage(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message status-${type}`;
+            statusMessage.style.display = 'block';
+        }
+
+        function hideStatusMessage() {
+            statusMessage.style.display = 'none';
+        }
+
+        function showNotification(message, type = 'info') {
+            // Show in-app notification
+            notificationElement.textContent = message;
+            notificationElement.className = `notification notification-${type}`;
+            notificationElement.style.display = 'block';
+            
+            // Play sound
+            try {
+                notificationSound.currentTime = 0;
+                notificationSound.play().catch(e => console.log("Erro ao tocar som:", e));
+            } catch (e) {
+                console.log("Erro com áudio:", e);
+            }
+            
+            // Show browser notification if permission granted
+            if (isNotificationPermissionGranted && type !== 'info') {
+                const notification = new Notification("MotoZap", {
+                    body: message,
+                    icon: "https://cdn-icons-png.flaticon.com/512/2965/2965306.png"
+                });
+                
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                };
+            }
+            
+            setTimeout(() => {
+                notificationElement.style.display = 'none';
+            }, 3000);
+        }
+
+        async function handleAuthSubmit(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showStatusMessage('Por favor, preencha todos os campos obrigatórios.', 'error');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showStatusMessage('A senha deve ter pelo menos 6 caracteres.', 'error');
+                return;
+            }
+            
+            try {
+                if (isLoginMode) {
+                    showStatusMessage('Entrando...', 'info');
+                    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                    showStatusMessage('Login realizado com sucesso!', 'success');
+                    
+                    setTimeout(() => {
+                        closeAuthModal();
+                        loadUserData(userCredential.user.uid);
+                    }, 1500);
+                } else {
+                    const name = document.getElementById('name')?.value.trim() || '';
+                    const phone = document.getElementById('phone')?.value.trim() || '';
+                    const vehicle = userRole === 'driver' ? document.getElementById('vehicle')?.value.trim() || '' : '';
+                    
+                    if (!name || !phone) {
+                        showStatusMessage('Por favor, preencha todos os campos obrigatórios.', 'error');
+                        return;
+                    }
+                    
+                    if (userRole === 'driver' && !vehicle) {
+                        showStatusMessage('Por favor, informe a placa da moto.', 'error');
+                        return;
+                    }
+                    
+                    showStatusMessage('Criando conta...', 'info');
+                    
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    const user = userCredential.user;
+                    
+                    const userData = {
+                        name: name,
+                        email: email,
+                        phone: phone,
+                        role: userRole,
+                        createdAt: new Date().toISOString(),
+                        uid: user.uid
+                    };
+                    
+                    if (userRole === 'driver') {
+                        userData.vehicle = vehicle;
+                        userData.available = false;
+                        userData.rating = 5.0;
+                        userData.totalRides = 0;
+                    }
+                    
+                    await database.ref('users/' + user.uid).set(userData);
+                    
+                    if (userRole === 'driver') {
+                        await database.ref('drivers/' + user.uid).set({
+                            name: name,
+                            email: email,
+                            phone: phone,
+                            vehicle: vehicle,
+                            available: false,
+                            rating: 5.0,
+                            totalRides: 0,
+                            createdAt: new Date().toISOString()
+                        });
+                    } else {
+                        await database.ref('passengers/' + user.uid).set({
+                            name: name,
+                            email: email,
+                            phone: phone,
+                            createdAt: new Date().toISOString()
+                        });
+                    }
+                    
+                    showStatusMessage('Conta criada com sucesso! Redirecionando...', 'success');
+                    
+                    setTimeout(() => {
+                        closeAuthModal();
+                        loadUserData(user.uid);
+                    }, 1500);
+                }
+            } catch (error) {
+                console.error('Authentication error:', error);
+                let errorMessage = 'Ocorreu um erro. Tente novamente.';
+                
+                switch (error.code) {
+                    case 'auth/email-already-in-use':
+                        errorMessage = 'Este e-mail já está em uso.';
+                        break;
+                    case 'auth/invalid-email':
+                        errorMessage = 'E-mail inválido.';
+                        break;
+                    case 'auth/weak-password':
+                        errorMessage = 'Senha muito fraca. Use pelo menos 6 caracteres.';
+                        break;
+                    case 'auth/user-not-found':
+                        errorMessage = 'Usuário não encontrado.';
+                        break;
+                    case 'auth/wrong-password':
+                        errorMessage = 'Senha incorreta.';
+                        break;
+                    case 'auth/network-request-failed':
+                        errorMessage = 'Erro de conexão. Verifique sua internet.';
+                        break;
+                }
+                
+                showStatusMessage(errorMessage, 'error');
+            }
+        }
+
+        async function loadUserData(userId) {
+            try {
+                const userSnapshot = await database.ref('users/' + userId).once('value');
+                const userData = userSnapshot.val();
+                
+                if (userData) {
+                    currentUser = { ...auth.currentUser, ...userData };
+                    
+                    userName.textContent = userData.name || 'Usuário';
+                    userRoleElement.textContent = userData.role === 'passenger' ? 'Passageiro' : 'Piloto';
+                    userAvatar.textContent = (userData.name && userData.name.charAt(0).toUpperCase()) || 'U';
+                    
+                    if (userData.role === 'passenger') {
+                        passengerDashboard.style.display = 'block';
+                        driverDashboard.style.display = 'none';
+                        notificationBell.style.display = 'none';
+                        loadPassengerHistory(userId);
+                        listenToPassengerRides(userId);
+                    } else {
+                        passengerDashboard.style.display = 'none';
+                        driverDashboard.style.display = 'block';
+                        notificationBell.style.display = 'block';
+                        setupDriverAvailability(userId);
+                        loadDriverHistory(userId);
+                        listenToRideRequests();
+                        listenToDriverActiveRide(userId);
+                        loadNotifications(userId);
+                        listenForNewRides();
+                    }
+                    
+                    showDashboard();
+                } else {
+                    await auth.signOut();
+                    showMainScreen();
+                    alert('Dados do usuário não encontrados. Por favor, faça login novamente.');
+                }
+            } catch (error) {
+                console.error('Error loading user data:', error);
+                showNotification('Erro ao carregar dados do usuário.', 'error');
+            }
+        }
+
+        function showMainScreen() {
+            mainScreen.style.display = 'block';
+            dashboardScreen.style.display = 'none';
+            
+            // Remove listeners
+            if (rideRequestsListener) {
+                rideRequestsListener();
+                rideRequestsListener = null;
+            }
+            if (passengerRideListener) {
+                passengerRideListener();
+                passengerRideListener = null;
+            }
+            if (driverActiveRideListener) {
+                driverActiveRideListener();
+                driverActiveRideListener = null;
+            }
+            if (notificationsListener) {
+                notificationsListener();
+                notificationsListener = null;
+            }
+        }
+
+        function showDashboard() {
+            mainScreen.style.display = 'none';
+            dashboardScreen.style.display = 'block';
+        }
+
+        function handleLogout() {
+            if (currentUser && currentUser.role === 'driver') {
+                database.ref('drivers/' + currentUser.uid).update({
+                    available: false,
+                    lastUpdate: new Date().toISOString()
+                });
+            }
+            
+            auth.signOut().then(() => {
+                currentUser = null;
+                currentRideId = null;
+                showMainScreen();
+            }).catch((error) => {
+                console.error('Logout error:', error);
+                showNotification('Erro ao fazer logout.', 'error');
+            });
+        }
+
+        // Driver Availability Functions
+        function setupDriverAvailability(userId) {
+            const toggleAvailabilityBtn = document.getElementById('toggleAvailabilityBtn');
+            const availabilityText = document.getElementById('availabilityText');
+            const availabilityStatus = document.getElementById('availabilityStatus');
+            
+            database.ref('drivers/' + userId + '/available').once('value')
+                .then(snapshot => {
+                    const isAvailable = snapshot.val() || false;
+                    updateDriverAvailabilityUI(isAvailable);
+                });
+            
+            toggleAvailabilityBtn.addEventListener('click', () => {
+                database.ref('drivers/' + userId + '/available').once('value')
+                    .then(snapshot => {
+                        const currentStatus = snapshot.val() || false;
+                        const newStatus = !currentStatus;
+                        
+                        database.ref('drivers/' + userId).update({
+                            available: newStatus,
+                            lastUpdate: new Date().toISOString()
+                        });
+                        
+                        updateDriverAvailabilityUI(newStatus);
+                        
+                        if (newStatus) {
+                            showNotification('Agora você está disponível para receber corridas!', 'success');
+                        } else {
+                            showNotification('Você está indisponível para corridas.', 'info');
+                        }
+                    });
+            });
+            
+            function updateDriverAvailabilityUI(isAvailable) {
+                if (isAvailable) {
+                    availabilityText.textContent = 'Ficar Indisponível';
+                    availabilityStatus.textContent = 'Status: Disponível para corridas';
+                    availabilityStatus.style.color = '#0a5c36';
+                } else {
+                    availabilityText.textContent = 'Ficar Disponível';
+                    availabilityStatus.textContent = 'Status: Indisponível';
+                    availabilityStatus.style.color = '#dc3545';
+                }
+            }
+        }
+
+        // Listen to ride requests for drivers
+        function listenToRideRequests() {
+            const rideRequestsList = document.getElementById('rideRequestsList');
+            const noRequestsMessage = document.getElementById('noRequestsMessage');
+            
+            if (rideRequestsListener) {
+                rideRequestsListener();
+            }
+            
+            rideRequestsListener = database.ref('rides')
+                .orderByChild('status')
+                .equalTo('pending')
+                .on('value', (snapshot) => {
+                    const rides = snapshot.val();
+                    rideRequestsList.innerHTML = '';
+                    
+                    if (rides) {
+                        noRequestsMessage.style.display = 'none';
+                        
+                        Object.keys(rides).forEach(rideId => {
+                            const ride = rides[rideId];
+                            
+                            // Check if driver is available
+                            database.ref('drivers/' + currentUser.uid + '/available').once('value')
+                                .then(driverSnapshot => {
+                                    const isAvailable = driverSnapshot.val();
+                                    
+                                    if (isAvailable) {
+                                        const rideElement = createRideRequestElement(rideId, ride);
+                                        rideRequestsList.appendChild(rideElement);
+                                    }
+                                });
+                        });
+                        
+                        if (rideRequestsList.children.length === 0) {
+                            noRequestsMessage.style.display = 'block';
+                        }
+                    } else {
+                        noRequestsMessage.style.display = 'block';
+                    }
+                });
+        }
+
+        // Listen for new rides (for notifications)
+        function listenForNewRides() {
+            if (notificationsListener) {
+                notificationsListener();
+            }
+            
+            let lastRideId = null;
+            
+            notificationsListener = database.ref('rides')
+                .orderByChild('status')
+                .equalTo('pending')
+                .on('child_added', (snapshot) => {
+                    const ride = snapshot.val();
+                    const rideId = snapshot.key;
+                    
+                    // Only notify if this is a new ride and driver is available
+                    if (rideId !== lastRideId) {
+                        lastRideId = rideId;
+                        
+                        database.ref('drivers/' + currentUser.uid + '/available').once('value')
+                            .then(driverSnapshot => {
+                                const isAvailable = driverSnapshot.val();
+                                
+                                if (isAvailable && currentUser.uid !== ride.passengerId) {
+                                    // Create notification for new ride
+                                    const notification = {
+                                        id: rideId,
+                                        type: 'new_ride',
+                                        title: 'Nova Corrida Disponível!',
+                                        message: `${ride.passengerName} solicitou uma corrida de ${ride.pickup} para ${ride.destination}`,
+                                        rideId: rideId,
+                                        timestamp: new Date().getTime(),
+                                        read: false
+                                    };
+                                    
+                                    // Save notification to database
+                                    database.ref(`notifications/${currentUser.uid}/${rideId}`).set(notification);
+                                    
+                                    // Show alert banner
+                                    showNewRideAlert(ride);
+                                    
+                                    // Show notification
+                                    showNotification(`Nova corrida de ${ride.passengerName}!`, 'warning');
+                                }
+                            });
+                    }
+                });
+        }
+
+        function showNewRideAlert(ride) {
+            newRideAlert.style.display = 'block';
+            alertMessage.textContent = `${ride.passengerName} solicitou uma corrida de ${ride.pickup} para ${ride.destination} por R$ ${ride.price}`;
+            
+            // Auto-hide after 30 seconds
+            setTimeout(() => {
+                newRideAlert.style.display = 'none';
+            }, 30000);
+        }
+
+        function createRideRequestElement(rideId, ride) {
+            const div = document.createElement('div');
+            div.className = 'driver-card';
+            div.innerHTML = `
+                <h4 style="color: #FF6600; margin-bottom: 10px;">Nova Corrida Disponível</h4>
+                <p><strong>Passageiro:</strong> ${ride.passengerName}</p>
+                <p><strong>De:</strong> ${ride.pickup}</p>
+                <p><strong>Para:</strong> ${ride.destination}</p>
+                <p><strong>Valor Sugerido:</strong> R$ ${ride.price}</p>
+                <p><strong>Telefone:</strong> ${ride.passengerPhone || 'Não informado'}</p>
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button class="btn-action accept-ride-btn" data-ride-id="${rideId}" style="background-color: #0a5c36;">
+                        <i class="fas fa-check"></i> Aceitar
+                    </button>
+                    <button class="btn-action decline-ride-btn" data-ride-id="${rideId}" style="background-color: #dc3545;">
+                        <i class="fas fa-times"></i> Recusar
+                    </button>
+                </div>
+            `;
+            
+            return div;
+        }
+
+        // Load notifications from database
+        async function loadNotifications(userId) {
+            try {
+                const notificationsSnapshot = await database.ref(`notifications/${userId}`).once('value');
+                const notificationsData = notificationsSnapshot.val();
+                
+                notifications = [];
+                notificationCount = 0;
+                
+                if (notificationsData) {
+                    Object.keys(notificationsData).forEach(key => {
+                        const notification = notificationsData[key];
+                        notifications.push(notification);
+                        if (!notification.read) {
+                            notificationCount++;
+                        }
+                    });
+                    
+                    // Sort by timestamp (newest first)
+                    notifications.sort((a, b) => b.timestamp - a.timestamp);
+                    
+                    updateNotificationUI();
+                }
+                
+                // Listen for new notifications
+                database.ref(`notifications/${userId}`).on('child_added', (snapshot) => {
+                    const notification = snapshot.val();
+                    addNotificationToList(notification, snapshot.key);
+                    updateNotificationCount();
+                });
+                
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+            }
+        }
+
+        function updateNotificationUI() {
+            // Update badge count
+            if (notificationCount > 0) {
+                notificationBadge.textContent = notificationCount;
+                notificationBadge.style.display = 'flex';
+            } else {
+                notificationBadge.style.display = 'none';
+            }
+            
+            // Update notification list
+            notificationList.innerHTML = '';
+            
+            if (notifications.length > 0) {
+                noNotifications.style.display = 'none';
+                notifications.forEach(notification => {
+                    addNotificationToList(notification, notification.id);
+                });
+            } else {
+                noNotifications.style.display = 'block';
+            }
+        }
+
+        function addNotificationToList(notification, key) {
+            const notificationItem = document.createElement('div');
+            notificationItem.className = `notification-item ${notification.read ? '' : 'unread'}`;
+            notificationItem.dataset.key = key;
+            notificationItem.dataset.rideId = notification.rideId || '';
+            
+            const timeAgo = getTimeAgo(notification.timestamp);
+            
+            notificationItem.innerHTML = `
+                <strong>${notification.title}</strong>
+                <p style="margin: 5px 0; font-size: 0.9rem;">${notification.message}</p>
+                <div class="notification-time">${timeAgo}</div>
+            `;
+            
+            notificationItem.addEventListener('click', () => {
+                markNotificationAsRead(key);
+                
+                if (notification.rideId) {
+                    // Scroll to ride requests
+                    document.getElementById('activeRideRequests').scrollIntoView({ behavior: 'smooth' });
+                    notificationDropdown.classList.remove('show');
+                }
+            });
+            
+            notificationList.appendChild(notificationItem);
+        }
+
+        function markNotificationAsRead(key) {
+            database.ref(`notifications/${currentUser.uid}/${key}`).update({
+                read: true
+            });
+            
+            // Update local array
+            const notificationIndex = notifications.findIndex(n => n.id === key);
+            if (notificationIndex !== -1) {
+                notifications[notificationIndex].read = true;
+                if (notificationCount > 0) {
+                    notificationCount--;
+                }
+                updateNotificationUI();
+            }
+        }
+
+        function clearAllNotifications() {
+            if (confirm('Limpar todas as notificações?')) {
+                database.ref(`notifications/${currentUser.uid}`).remove()
+                    .then(() => {
+                        notifications = [];
+                        notificationCount = 0;
+                        updateNotificationUI();
+                        showNotification('Notificações limpas.', 'info');
+                    })
+                    .catch(error => {
+                        console.error('Error clearing notifications:', error);
+                        showNotification('Erro ao limpar notificações.', 'error');
+                    });
+            }
+        }
+
+        function getTimeAgo(timestamp) {
+            const now = new Date().getTime();
+            const diff = now - timestamp;
+            
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            
+            if (minutes < 1) return 'Agora mesmo';
+            if (minutes < 60) return `Há ${minutes} min${minutes > 1 ? 's' : ''}`;
+            if (hours < 24) return `Há ${hours} hora${hours > 1 ? 's' : ''}`;
+            return `Há ${days} dia${days > 1 ? 's' : ''}`;
+        }
+
+        // Listen to passenger rides
+        function listenToPassengerRides(userId) {
+            if (passengerRideListener) {
+                passengerRideListener();
+            }
+            
+            passengerRideListener = database.ref('rides')
+                .orderByChild('passengerId')
+                .equalTo(userId)
+                .on('value', (snapshot) => {
+                    const rides = snapshot.val();
+                    
+                    if (rides) {
+                        // Find active ride (pending or accepted)
+                        Object.keys(rides).forEach(rideId => {
+                            const ride = rides[rideId];
+                            if (ride.status === 'pending' || ride.status === 'accepted' || ride.status === 'started') {
+                                currentRideId = rideId;
+                                updatePassengerRideStatus(ride);
+                            }
+                        });
+                    }
+                });
+        }
+
+        // Listen to driver active ride
+        function listenToDriverActiveRide(driverId) {
+            if (driverActiveRideListener) {
+                driverActiveRideListener();
+            }
+            
+            driverActiveRideListener = database.ref('rides')
+                .orderByChild('driverId')
+                .equalTo(driverId)
+                .on('value', (snapshot) => {
+                    const rides = snapshot.val();
+                    
+                    if (rides) {
+                        Object.keys(rides).forEach(rideId => {
+                            const ride = rides[rideId];
+                            if (ride.status === 'accepted' || ride.status === 'started') {
+                                currentRideId = rideId;
+                                showDriverActiveRide(ride);
+                            }
+                        });
+                    }
+                });
+        }
+
+        // Load passenger ride history
+        async function loadPassengerHistory(userId) {
+            try {
+                const historySnapshot = await database.ref('rides').orderByChild('passengerId').equalTo(userId).once('value');
+                const history = historySnapshot.val();
+                
+                if (history) {
+                    const historyList = document.getElementById('historyList');
+                    const noHistoryMessage = document.getElementById('noHistoryMessage');
+                    
+                    noHistoryMessage.style.display = 'none';
+                    historyList.style.display = 'block';
+                    historyList.innerHTML = '';
+                    
+                    Object.keys(history).forEach(key => {
+                        const ride = history[key];
+                        const rideElement = document.createElement('div');
+                        rideElement.className = 'driver-card';
+                        rideElement.innerHTML = `
+                            <p><strong>De:</strong> ${ride.pickup}</p>
+                            <p><strong>Para:</strong> ${ride.destination}</p>
+                            <p><strong>Piloto:</strong> ${ride.driverName || 'Aguardando'}</p>
+                            <p><strong>Valor:</strong> R$ ${ride.price || '0,00'}</p>
+                            <p><strong>Status:</strong> <span style="color: ${getStatusColor(ride.status)}">${getStatusText(ride.status)}</span></p>
+                            <p><strong>Data:</strong> ${new Date(ride.createdAt).toLocaleDateString('pt-BR')}</p>
+                        `;
+                        historyList.appendChild(rideElement);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading passenger history:', error);
+            }
+        }
+
+        // Load driver ride history
+        async function loadDriverHistory(userId) {
+            try {
+                const historySnapshot = await database.ref('rides').orderByChild('driverId').equalTo(userId).once('value');
+                const history = historySnapshot.val();
+                
+                if (history) {
+                    const driverHistoryList = document.getElementById('driverHistoryList');
+                    const driverNoHistoryMessage = document.getElementById('driverNoHistoryMessage');
+                    
+                    driverNoHistoryMessage.style.display = 'none';
+                    driverHistoryList.style.display = 'block';
+                    driverHistoryList.innerHTML = '';
+                    
+                    Object.keys(history).forEach(key => {
+                        const ride = history[key];
+                        const rideElement = document.createElement('div');
+                        rideElement.className = 'driver-card';
+                        rideElement.innerHTML = `
+                            <p><strong>Passageiro:</strong> ${ride.passengerName}</p>
+                            <p><strong>Rota:</strong> ${ride.pickup} → ${ride.destination}</p>
+                            <p><strong>Valor:</strong> R$ ${ride.price || '0,00'}</p>
+                            <p><strong>Status:</strong> <span style="color: ${getStatusColor(ride.status)}">${getStatusText(ride.status)}</span></p>
+                            <p><strong>Data:</strong> ${new Date(ride.createdAt).toLocaleDateString('pt-BR')}</p>
+                        `;
+                        driverHistoryList.appendChild(rideElement);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading driver history:', error);
+            }
+        }
+
+        function updatePassengerRideStatus(ride) {
+            const rideStatus = document.getElementById('rideStatus');
+            const rideStatusIcon = document.getElementById('rideStatusIcon');
+            const rideStatusTitle = document.getElementById('rideStatusTitle');
+            const rideDetails = document.getElementById('rideDetails');
+            
+            rideStatus.style.display = 'block';
+            
+            let statusText = '';
+            let iconClass = 'fas fa-spinner fa-spin';
+            let title = 'Status da Corrida';
+            
+            switch(ride.status) {
+                case 'pending':
+                    statusText = 'Aguardando aceitação de um piloto...';
+                    iconClass = 'fas fa-spinner fa-spin';
+                    title = 'Buscando Piloto';
+                    break;
+                case 'accepted':
+                    statusText = `Piloto ${ride.driverName} aceitou sua corrida!`;
+                    iconClass = 'fas fa-check-circle';
+                    title = 'Corrida Aceita';
+                    break;
+                case 'started':
+                    statusText = `Piloto ${ride.driverName} iniciou a corrida!`;
+                    iconClass = 'fas fa-motorcycle';
+                    title = 'Corrida em Andamento';
+                    break;
+                case 'completed':
+                    statusText = 'Corrida finalizada com sucesso!';
+                    iconClass = 'fas fa-flag-checkered';
+                    title = 'Corrida Concluída';
+                    break;
+                case 'cancelled':
+                    statusText = 'Corrida cancelada.';
+                    iconClass = 'fas fa-times-circle';
+                    title = 'Corrida Cancelada';
+                    break;
+            }
+            
+            rideStatusIcon.className = iconClass;
+            rideStatusTitle.textContent = title;
+            
+            rideDetails.innerHTML = `
+                <div class="ride-details">
+                    <div class="ride-detail-item">
+                        <span><strong>Partida:</strong></span>
+                        <span>${ride.pickup}</span>
+                    </div>
+                    <div class="ride-detail-item">
+                        <span><strong>Destino:</strong></span>
+                        <span>${ride.destination}</span>
+                    </div>
+                    <div class="ride-detail-item">
+                        <span><strong>Valor:</strong></span>
+                        <span>R$ ${ride.price}</span>
+                    </div>
+                    ${ride.driverName ? `
+                    <div class="ride-detail-item">
+                        <span><strong>Piloto:</strong></span>
+                        <span>${ride.driverName}</span>
+                    </div>
+                    <div class="ride-detail-item">
+                        <span><strong>Telefone do Piloto:</strong></span>
+                        <span>${ride.driverPhone || 'Não informado'}</span>
+                    </div>
+                    <div class="ride-detail-item">
+                        <span><strong>Status:</strong></span>
+                        <span style="color: ${getStatusColor(ride.status)}">${getStatusText(ride.status)}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            const cancelBtn = document.getElementById('cancelRideBtn');
+            if (ride.status === 'pending') {
+                cancelBtn.style.display = 'inline-block';
+            } else {
+                cancelBtn.style.display = 'none';
+            }
+        }
+
+        function showDriverActiveRide(ride) {
+            const activeRide = document.getElementById('activeRide');
+            const activeRideDetails = document.getElementById('activeRideDetails');
+            const startRideBtn = document.getElementById('startRideBtn');
+            const completeRideBtn = document.getElementById('completeRideBtn');
+            
+            activeRide.style.display = 'block';
+            
+            activeRideDetails.innerHTML = `
+                <div class="ride-details">
+                    <div class="ride-detail-item">
+                        <span><strong>Passageiro:</strong></span>
+                        <span>${ride.passengerName}</span>
+                    </div>
+                    <div class="ride-detail-item">
+                        <span><strong>Telefone:</strong></span>
+                        <span>${ride.passengerPhone || 'Não informado'}</span>
+                    </div>
+                    <div class="ride-detail-item">
+                        <span><strong>Partida:</strong></span>
+                        <span>${ride.pickup}</span>
+                    </div>
+                    <div class="ride-detail-item">
+                        <span><strong>Destino:</strong></span>
+                        <span>${ride.destination}</span>
+                    </div>
+                    <div class="ride-detail-item">
+                        <span><strong>Valor:</strong></span>
+                        <span>R$ ${ride.price}</span>
+                    </div>
+                    <div class="ride-detail-item">
+                        <span><strong>Status:</strong></span>
+                        <span style="color: ${getStatusColor(ride.status)}">${getStatusText(ride.status)}</span>
+                    </div>
+                </div>
+            `;
+            
+            if (ride.status === 'accepted') {
+                startRideBtn.style.display = 'inline-block';
+                completeRideBtn.style.display = 'none';
+            } else if (ride.status === 'started') {
+                startRideBtn.style.display = 'none';
+                completeRideBtn.style.display = 'inline-block';
+            }
+            
+            // Hide ride requests when there's an active ride
+            document.getElementById('activeRideRequests').style.display = 'none';
+            newRideAlert.style.display = 'none';
+        }
+
+        // Helper functions
+        function getStatusColor(status) {
+            switch(status) {
+                case 'pending': return '#FF9900';
+                case 'accepted': return '#0a5c36';
+                case 'started': return '#2c5282';
+                case 'completed': return '#0a5c36';
+                case 'cancelled': return '#dc3545';
+                default: return '#666';
+            }
+        }
+
+        function getStatusText(status) {
+            switch(status) {
+                case 'pending': return 'Pendente';
+                case 'accepted': return 'Aceita';
+                case 'started': return 'Em Andamento';
+                case 'completed': return 'Concluída';
+                case 'cancelled': return 'Cancelada';
+                default: return status;
+            }
+        }
+
+        function updateNotificationCount() {
+            notificationCount = notifications.filter(n => !n.read).length;
+            if (notificationCount > 0) {
+                notificationBadge.textContent = notificationCount > 9 ? '9+' : notificationCount;
+                notificationBadge.style.display = 'flex';
+            } else {
+                notificationBadge.style.display = 'none';
+            }
+        }
+
+        // Ride request functionality
+        document.getElementById('requestRideBtn')?.addEventListener('click', async () => {
+            const pickup = document.getElementById('pickupLocation').value;
+            const destination = document.getElementById('destination').value;
+            const price = document.getElementById('ridePrice').value;
+            
+            if (!pickup || !destination) {
+                alert('Por favor, preencha os campos de partida e destino.');
+                return;
+            }
+            
+            if (!price || price < 5) {
+                alert('Por favor, informe um valor mínimo de R$ 5,00.');
+                return;
+            }
+            
+            try {
+                const rideData = {
+                    passengerId: currentUser.uid,
+                    passengerName: currentUser.name,
+                    passengerPhone: currentUser.phone,
+                    pickup: pickup,
+                    destination: destination,
+                    price: parseFloat(price).toFixed(2),
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                };
+                
+                const newRideRef = database.ref('rides').push();
+                await newRideRef.set(rideData);
+                
+                currentRideId = newRideRef.key;
+                
+                updatePassengerRideStatus(rideData);
+                loadPassengerHistory(currentUser.uid);
+                
+                showNotification('Corrida solicitada com sucesso! Aguarde um piloto.', 'success');
+                
+            } catch (error) {
+                console.error('Error requesting ride:', error);
+                showNotification('Erro ao solicitar corrida. Tente novamente.', 'error');
+            }
+        });
+
+        // Cancel ride for passenger
+        document.getElementById('cancelRideBtn')?.addEventListener('click', async () => {
+            if (!currentRideId) return;
+            
+            if (confirm('Tem certeza que deseja cancelar esta corrida?')) {
+                try {
+                    await database.ref('rides/' + currentRideId).update({
+                        status: 'cancelled',
+                        cancelledAt: new Date().toISOString()
+                    });
+                    
+                    // Make driver available again if there was one
+                    const rideSnapshot = await database.ref('rides/' + currentRideId).once('value');
+                    const ride = rideSnapshot.val();
+                    
+                    if (ride && ride.driverId) {
+                        await database.ref('drivers/' + ride.driverId).update({
+                            available: true,
+                            lastUpdate: new Date().toISOString()
+                        });
+                    }
+                    
+                    showNotification('Corrida cancelada com sucesso.', 'success');
+                    loadPassengerHistory(currentUser.uid);
+                    
+                } catch (error) {
+                    console.error('Error cancelling ride:', error);
+                    showNotification('Erro ao cancelar corrida.', 'error');
+                }
+            }
+        });
+
+        // Event delegation for ride request buttons
+        document.getElementById('rideRequestsList')?.addEventListener('click', async (e) => {
+            const rideId = e.target.closest('button')?.dataset.rideId;
+            if (!rideId) return;
+            
+            const rideSnapshot = await database.ref('rides/' + rideId).once('value');
+            const ride = rideSnapshot.val();
+            
+            if (!ride) return;
+            
+            if (e.target.closest('.accept-ride-btn')) {
+                // Accept ride
+                try {
+                    await database.ref('rides/' + rideId).update({
+                        status: 'accepted',
+                        driverId: currentUser.uid,
+                        driverName: currentUser.name,
+                        driverPhone: currentUser.phone,
+                        acceptedAt: new Date().toISOString()
+                    });
+                    
+                    await database.ref('drivers/' + currentUser.uid).update({
+                        available: false,
+                        lastUpdate: new Date().toISOString()
+                    });
+                    
+                    // Create notification for passenger
+                    const passengerNotification = {
+                        id: `ride_accepted_${rideId}`,
+                        type: 'ride_accepted',
+                        title: 'Corrida Aceita!',
+                        message: `Piloto ${currentUser.name} aceitou sua corrida`,
+                        rideId: rideId,
+                        timestamp: new Date().getTime(),
+                        read: false
+                    };
+                    
+                    await database.ref(`notifications/${ride.passengerId}/ride_accepted_${rideId}`).set(passengerNotification);
+                    
+                    showNotification('Corrida aceita com sucesso!', 'success');
+                    
+                } catch (error) {
+                    console.error('Error accepting ride:', error);
+                    showNotification('Erro ao aceitar corrida.', 'error');
+                }
+                
+            } else if (e.target.closest('.decline-ride-btn')) {
+                // Decline ride
+                if (confirm('Recusar esta corrida?')) {
+                    try {
+                        await database.ref('rides/' + rideId).update({
+                            status: 'cancelled',
+                            cancelledAt: new Date().toISOString(),
+                            cancelledBy: 'driver'
+                        });
+                        
+                        showNotification('Corrida recusada.', 'info');
+                        
+                    } catch (error) {
+                        console.error('Error declining ride:', error);
+                        showNotification('Erro ao recusar corrida.', 'error');
+                    }
+                }
+            }
+        });
+
+        // Start ride for driver
+        document.getElementById('startRideBtn')?.addEventListener('click', async () => {
+            if (!currentRideId) return;
+            
+            try {
+                await database.ref('rides/' + currentRideId).update({
+                    status: 'started',
+                    startedAt: new Date().toISOString()
+                });
+                
+                // Create notification for passenger
+                const rideSnapshot = await database.ref('rides/' + currentRideId).once('value');
+                const ride = rideSnapshot.val();
+                
+                if (ride) {
+                    const passengerNotification = {
+                        id: `ride_started_${currentRideId}`,
+                        type: 'ride_started',
+                        title: 'Corrida Iniciada!',
+                        message: `Piloto ${currentUser.name} iniciou a corrida`,
+                        rideId: currentRideId,
+                        timestamp: new Date().getTime(),
+                        read: false
+                    };
+                    
+                    await database.ref(`notifications/${ride.passengerId}/ride_started_${currentRideId}`).set(passengerNotification);
+                }
+                
+                showNotification('Corrida iniciada!', 'success');
+                
+            } catch (error) {
+                console.error('Error starting ride:', error);
+                showNotification('Erro ao iniciar corrida.', 'error');
+            }
+        });
+
+        // Complete ride for driver
+        document.getElementById('completeRideBtn')?.addEventListener('click', async () => {
+            if (!currentRideId) return;
+            
+            if (confirm('Confirmar finalização da corrida?')) {
+                try {
+                    await database.ref('rides/' + currentRideId).update({
+                        status: 'completed',
+                        completedAt: new Date().toISOString()
+                    });
+                    
+                    await database.ref('drivers/' + currentUser.uid).update({
+                        available: true,
+                        lastUpdate: new Date().toISOString()
+                    });
+                    
+                    // Update driver stats
+                    const driverSnapshot = await database.ref('drivers/' + currentUser.uid).once('value');
+                    const driverData = driverSnapshot.val();
+                    const newTotalRides = (driverData.totalRides || 0) + 1;
+                    
+                    await database.ref('drivers/' + currentUser.uid).update({
+                        totalRides: newTotalRides
+                    });
+                    
+                    // Create notification for passenger
+                    const rideSnapshot = await database.ref('rides/' + currentRideId).once('value');
+                    const ride = rideSnapshot.val();
+                    
+                    if (ride) {
+                        const passengerNotification = {
+                            id: `ride_completed_${currentRideId}`,
+                            type: 'ride_completed',
+                            title: 'Corrida Concluída!',
+                            message: `Piloto ${currentUser.name} finalizou a corrida`,
+                            rideId: currentRideId,
+                            timestamp: new Date().getTime(),
+                            read: false
+                        };
+                        
+                        await database.ref(`notifications/${ride.passengerId}/ride_completed_${currentRideId}`).set(passengerNotification);
+                    }
+                    
+                    document.getElementById('activeRide').style.display = 'none';
+                    showNotification('Corrida finalizada com sucesso!', 'success');
+                    
+                    loadDriverHistory(currentUser.uid);
+                    setupDriverAvailability(currentUser.uid);
+                    
+                    // Show ride requests again
+                    document.getElementById('activeRideRequests').style.display = 'block';
+                    
+                } catch (error) {
+                    console.error('Error completing ride:', error);
+                    showNotification('Erro ao finalizar corrida.', 'error');
+                }
+            }
+        });
+
+        // Cancel active ride for driver
+        document.getElementById('cancelActiveRideBtn')?.addEventListener('click', async () => {
+            if (!currentRideId) return;
+            
+            if (confirm('Cancelar esta corrida?')) {
+                try {
+                    await database.ref('rides/' + currentRideId).update({
+                        status: 'cancelled',
+                        cancelledAt: new Date().toISOString(),
+                        cancelledBy: 'driver'
+                    });
+                    
+                    await database.ref('drivers/' + currentUser.uid).update({
+                        available: true,
+                        lastUpdate: new Date().toISOString()
+                    });
+                    
+                    document.getElementById('activeRide').style.display = 'none';
+                    showNotification('Corrida cancelada.', 'info');
+                    
+                    setupDriverAvailability(currentUser.uid);
+                    document.getElementById('activeRideRequests').style.display = 'block';
+                    
+                } catch (error) {
+                    console.error('Error cancelling active ride:', error);
+                    showNotification('Erro ao cancelar corrida.', 'error');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
