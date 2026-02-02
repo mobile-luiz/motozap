@@ -1919,64 +1919,90 @@ self.addEventListener('message', event => {
         }
 
         // Initialize Firebase Messaging
-        async function initializeFirebaseMessaging() {
-            try {
-                if (!serviceWorkerRegistration) {
-                    console.log('Service Worker não registrado');
-                    return;
-                }
+      async function initializeFirebaseMessaging() {
+    try {
+        // Solicitar permissão para notificações
+        const permission = await Notification.requestPermission();
+        
+        if (permission === 'granted') {
+            console.log('Permissão de notificação concedida');
+            
+            // Registrar Service Worker primeiro
+            if ('serviceWorker' in navigator) {
+                // Obter registro do Service Worker
+                const registration = await navigator.serviceWorker.ready;
+                
+                console.log('Service Worker registrado, usando:', registration);
+                
+                // Usar a VAPID key pública
+                const vapidKey = 'BE6r0LR0z1pSzQRnNRV0TGbQ7QOY9epBAPJgLj0v2lS3JYVg3nSFhU1gyV_x3T1bZakO0pN_rB4Lw8YdWx1Sq_o';
                 
                 // Obter token FCM
-                fcmToken = await messaging.getToken({
-                    serviceWorkerRegistration: serviceWorkerRegistration,
-                    vapidKey: 'BE6r0LR0z1pSzQRnNRV0TGbQ7QOY9epBAPJgLj0v2lS3JYVg3nSFhU1gyV_x3T1bZakO0pN_rB4Lw8YdWx1Sq_o'
-                });
-                
-                if (fcmToken) {
-                    console.log('Token FCM obtido:', fcmToken);
-                    
-                    // Salvar token no banco de dados
-                    if (currentUser) {
-                        await saveFCMTokenToDatabase(fcmToken);
-                    }
-                    
-                    // Configurar handler para atualização do token
-                    messaging.onTokenRefresh(async () => {
-                        console.log('Token FCM atualizado');
-                        const newToken = await messaging.getToken({
-                            serviceWorkerRegistration: serviceWorkerRegistration,
-                            vapidKey: 'BE6r0LR0z1pSzQRnNRV0TGbQ7QOY9epBAPJgLj0v2lS3JYVg3nSFhU1gyV_x3T1bZakO0pN_rB4Lw8YdWx1Sq_o'
-                        });
-                        fcmToken = newToken;
-                        
-                        if (currentUser) {
-                            await saveFCMTokenToDatabase(newToken);
-                        }
+                try {
+                    fcmToken = await messaging.getToken({
+                        serviceWorkerRegistration: registration,
+                        vapidKey: vapidKey
                     });
                     
-                    // Configurar handler para mensagens em primeiro plano
-                    messaging.onMessage((payload) => {
-                        console.log('Mensagem recebida em primeiro plano:', payload);
+                    if (fcmToken) {
+                        console.log('Token FCM obtido:', fcmToken);
+                        messagingInitialized = true;
                         
-                        // Mostrar notificação no app
+                        // Salvar token no banco de dados
+                        if (currentUser) {
+                            await saveFCMTokenToDatabase(fcmToken);
+                        }
+                        
+                        // Enviar token para o Service Worker
+                        if (registration.active) {
+                            registration.active.postMessage({
+                                type: 'FCM_TOKEN',
+                                token: fcmToken
+                            });
+                        }
+                    } else {
+                        console.log('Não foi possível obter token FCM');
+                    }
+                } catch (tokenError) {
+                    console.error('Erro ao obter token FCM:', tokenError);
+                }
+                
+                // Configurar handler para mensagens em primeiro plano
+                messaging.onMessage((payload) => {
+                    console.log('Mensagem recebida em primeiro plano:', payload);
+                    
+                    // Mostrar notificação no app
+                    if (payload.notification) {
                         showMobileNotification({
-                            title: payload.notification?.title || 'MotoZap',
-                            message: payload.notification?.body || payload.data?.message || 'Nova notificação',
+                            title: payload.notification.title,
+                            message: payload.notification.body,
                             type: payload.data?.type || 'info',
                             data: payload.data
                         });
+                    }
+                });
+                
+                // Configurar handler para atualização do token
+                messaging.onTokenRefresh(async () => {
+                    console.log('Token FCM atualizado');
+                    const newToken = await messaging.getToken({
+                        serviceWorkerRegistration: registration,
+                        vapidKey: vapidKey
                     });
-                }
-                
-            } catch (error) {
-                console.error('Erro ao inicializar Firebase Messaging:', error);
-                
-                // Fallback para notificações locais
-                if (error.code === 'messaging/unsupported-browser') {
-                    console.log('Firebase Messaging não suportado, usando notificações locais');
-                }
+                    fcmToken = newToken;
+                    
+                    if (currentUser) {
+                        await saveFCMTokenToDatabase(newToken);
+                    }
+                });
             }
+        } else {
+            console.log('Permissão de notificação negada:', permission);
         }
+    } catch (error) {
+        console.error('Erro ao inicializar Firebase Messaging:', error);
+    }
+}
 
         // Save FCM token to database
         async function saveFCMTokenToDatabase(token) {
