@@ -20,18 +20,21 @@ firebase.initializeApp(firebaseConfig);
 // Obter instância do Firebase Messaging
 const messaging = firebase.messaging();
 
-// Configurar o background handler
-messaging.setBackgroundMessageHandler(function(payload) {
+// Configurar o background handler (CORRIGIDO)
+messaging.setBackgroundMessageHandler(async (payload) => {
     console.log('[firebase-messaging-sw.js] Received background message:', payload);
     
-    // Personalizar a notificação
+    // Extrair dados da notificação
     const notificationTitle = payload.data?.title || payload.notification?.title || 'MotoZap';
+    const notificationBody = payload.data?.body || payload.notification?.body || 'Nova notificação do MotoZap';
+    
+    // Personalizar a notificação
     const notificationOptions = {
-        body: payload.data?.body || payload.notification?.body || 'Nova notificação do MotoZap',
+        body: notificationBody,
         icon: 'https://cdn-icons-png.flaticon.com/512/2965/2965358.png',
         badge: 'https://cdn-icons-png.flaticon.com/512/2965/2965358.png',
         tag: 'motozap-notification',
-        data: payload.data || {},
+        data: payload.data || payload,
         requireInteraction: true,
         actions: []
     };
@@ -60,6 +63,7 @@ messaging.setBackgroundMessageHandler(function(payload) {
         ];
     }
     
+    // Mostrar a notificação
     return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 

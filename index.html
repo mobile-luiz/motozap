@@ -1919,53 +1919,39 @@ self.addEventListener('message', event => {
         }
 
         // Initialize Firebase Messaging
-      async function initializeFirebaseMessaging() {
+async function initializeFirebaseMessaging() {
     try {
-        // Solicitar permissão para notificações
+        // Verificar se já temos permissão
         const permission = await Notification.requestPermission();
         
         if (permission === 'granted') {
             console.log('Permissão de notificação concedida');
             
-            // Registrar Service Worker primeiro
-            if ('serviceWorker' in navigator) {
-                // Obter registro do Service Worker
-                const registration = await navigator.serviceWorker.ready;
+            // Obter o Service Worker registrado
+            const registration = await navigator.serviceWorker.ready;
+            
+            console.log('Service Worker registrado, usando:', registration);
+            
+            // Obter token FCM (CORRETO)
+            fcmToken = await messaging.getToken({
+                serviceWorkerRegistration: registration,
+                vapidKey: 'BE6r0LR0z1pSzQRnNRV0TGbQ7QOY9epBAPJgLj0v2lS3JYVg3nSFhU1gyV_x3T1bZakO0pN_rB4Lw8YdWx1Sq_o' // Sua chave pública VAPID real
+            });
+            
+            if (fcmToken) {
+                console.log('Token FCM obtido:', fcmToken);
                 
-                console.log('Service Worker registrado, usando:', registration);
+                // Salvar token no banco de dados
+                if (currentUser) {
+                    await saveFCMTokenToDatabase(fcmToken);
+                }
                 
-                // Usar a VAPID key pública
-                //const vapidKey = 'BE6r0LR0z1pSzQRnNRV0TGbQ7QOY9epBAPJgLj0v2lS3JYVg3nSFhU1gyV_x3T1bZakO0pN_rB4Lw8YdWx1Sq_o';
-                const vapidKey = 'BHZkpGbYQLzHVVLde3xlC76ZQ72pxPdS3UOL7y8lobivhxwbw6m6';
-                
-                // Obter token FCM
-                try {
-                    fcmToken = await messaging.getToken({
-                        serviceWorkerRegistration: registration,
-                        vapidKey: vapidKey
+                // Enviar token para o Service Worker
+                if (registration.active) {
+                    registration.active.postMessage({
+                        type: 'FCM_TOKEN',
+                        token: fcmToken
                     });
-                    
-                    if (fcmToken) {
-                        console.log('Token FCM obtido:', fcmToken);
-                        messagingInitialized = true;
-                        
-                        // Salvar token no banco de dados
-                        if (currentUser) {
-                            await saveFCMTokenToDatabase(fcmToken);
-                        }
-                        
-                        // Enviar token para o Service Worker
-                        if (registration.active) {
-                            registration.active.postMessage({
-                                type: 'FCM_TOKEN',
-                                token: fcmToken
-                            });
-                        }
-                    } else {
-                        console.log('Não foi possível obter token FCM');
-                    }
-                } catch (tokenError) {
-                    console.error('Erro ao obter token FCM:', tokenError);
                 }
                 
                 // Configurar handler para mensagens em primeiro plano
@@ -1987,8 +1973,7 @@ self.addEventListener('message', event => {
                 messaging.onTokenRefresh(async () => {
                     console.log('Token FCM atualizado');
                     const newToken = await messaging.getToken({
-                        serviceWorkerRegistration: registration,
-                        vapidKey: vapidKey
+                        serviceWorkerRegistration: registration
                     });
                     fcmToken = newToken;
                     
@@ -1996,12 +1981,19 @@ self.addEventListener('message', event => {
                         await saveFCMTokenToDatabase(newToken);
                     }
                 });
+                
+                return true;
+            } else {
+                console.log('Não foi possível obter token FCM');
+                return false;
             }
         } else {
             console.log('Permissão de notificação negada:', permission);
+            return false;
         }
     } catch (error) {
         console.error('Erro ao inicializar Firebase Messaging:', error);
+        return false;
     }
 }
 
